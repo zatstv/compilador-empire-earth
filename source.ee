@@ -9,6 +9,6 @@ fundar_ciudad
     madera <- 150;
     oro    <- comida;
     era    <- 5;
-    animo  <- 1.75;
+    animo  <- 3;
     vecino <- paz;
 victoria

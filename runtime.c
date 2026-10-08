@@ -8,7 +8,7 @@ static void set_default(Symbol *symbol) {
   switch (symbol->type) {
   case TYPE_RECURSO: symbol->value.intValue = 0; break;
   case TYPE_EPOCA: symbol->value.intValue = 1; break;
-  case TYPE_MORAL: symbol->value.floatValue = 0.0; break;
+  case TYPE_MORAL: symbol->value.intValue = 0; break;
   case TYPE_HEROE: symbol->value.strValue = string_copy(""); break;
   case TYPE_ALIADO: symbol->value.boolValue = 0; break;
   case TYPE_UNKNOWN: break;
@@ -18,7 +18,6 @@ static void set_default(Symbol *symbol) {
 
 static int store(Symbol *target, const ASTNode *value, const SymbolTable *table) {
   long int_value = 0;
-  double float_value = 0.0;
   const char *text = "";
   int bool_value = 0;
 
@@ -26,16 +25,15 @@ static int store(Symbol *target, const ASTNode *value, const SymbolTable *table)
     const Symbol *source = symbol_table_lookup(table, value->data.identifier);
     switch (source->type) {
     case TYPE_RECURSO:
-    case TYPE_EPOCA: int_value = source->value.intValue; float_value = (double)int_value; break;
-    case TYPE_MORAL: float_value = source->value.floatValue; break;
+    case TYPE_EPOCA:
+    case TYPE_MORAL: int_value = source->value.intValue; break;
     case TYPE_HEROE: text = source->value.strValue; break;
     case TYPE_ALIADO: bool_value = source->value.boolValue; break;
     case TYPE_UNKNOWN: break;
     }
   } else {
     switch (value->type) {
-    case INT_LITERAL: int_value = value->data.intValue; float_value = (double)int_value; break;
-    case FLOAT_LITERAL: float_value = value->data.floatValue; break;
+    case INT_LITERAL: int_value = value->data.intValue; break;
     case STR_LITERAL: text = value->data.strValue; break;
     case BOOL_LITERAL: bool_value = value->data.boolValue; break;
     default: break;
@@ -51,8 +49,15 @@ static int store(Symbol *target, const ASTNode *value, const SymbolTable *table)
     }
     target->value.intValue = int_value;
     break;
+  case TYPE_MORAL:
+    if (int_value < 0 || int_value > 5) {
+      fprintf(stderr, "DERROTA en la linea %d: la moral solo va de 0 a 5 ('%s' quedaria en %ld)\n",
+              value->line, target->name, int_value);
+      return 0;
+    }
+    target->value.intValue = int_value;
+    break;
   case TYPE_RECURSO: target->value.intValue = int_value; break;
-  case TYPE_MORAL: target->value.floatValue = float_value; break;
   case TYPE_HEROE: {
     char *copy = string_copy(text);
     free(target->value.strValue);

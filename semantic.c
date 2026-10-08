@@ -22,8 +22,8 @@ static const char *article(DataType type) {
 static ValueKind kind_of_type(DataType type) {
   switch (type) {
   case TYPE_RECURSO:
-  case TYPE_EPOCA: return VALUE_INT;
-  case TYPE_MORAL: return VALUE_FLOAT;
+  case TYPE_EPOCA:
+  case TYPE_MORAL: return VALUE_INT;
   case TYPE_HEROE: return VALUE_TEXT;
   case TYPE_ALIADO: return VALUE_BOOL;
   case TYPE_UNKNOWN: return VALUE_NONE;
@@ -45,8 +45,8 @@ static const char *kind_description(ValueKind kind) {
 static int accepts(DataType target, ValueKind kind) {
   switch (target) {
   case TYPE_RECURSO:
-  case TYPE_EPOCA: return kind == VALUE_INT;
-  case TYPE_MORAL: return kind == VALUE_INT || kind == VALUE_FLOAT;
+  case TYPE_EPOCA:
+  case TYPE_MORAL: return kind == VALUE_INT;
   case TYPE_HEROE: return kind == VALUE_TEXT;
   case TYPE_ALIADO: return kind == VALUE_BOOL;
   case TYPE_UNKNOWN: return 0;
@@ -73,6 +73,11 @@ static void check_value(DataType target, ASTNode *value, const SymbolTable *tabl
   if (target == TYPE_EPOCA && value->type == INT_LITERAL &&
       (value->data.intValue < 1 || value->data.intValue > 14)) {
     defeat(value->line, "solo existen 14 epocas (se puso %ld)", value->data.intValue);
+  }
+
+  if (target == TYPE_MORAL && value->type == INT_LITERAL &&
+      (value->data.intValue < 0 || value->data.intValue > 5)) {
+    defeat(value->line, "la moral solo va de 0 a 5 (se puso %ld)", value->data.intValue);
   }
 }
 

@@ -24,7 +24,7 @@ fundar_ciudad
     madera <- 150;
     oro    <- comida;
     era    <- 5;
-    animo  <- 1.75;
+    animo  <- 3;
     vecino <- paz;
 victoria
 ```
@@ -35,7 +35,7 @@ victoria
 |------|------------|---------------|
 | recurso | números enteros (0 o más) | 0 |
 | epoca | número entero del 1 al 14, como las épocas del juego | 1 |
-| moral | números con decimales | 0.0 |
+| moral | número entero del 0 al 5, como los puntos de moral de las unidades | 0 |
 | heroe | texto entre comillas | "" |
 | aliado | `paz` o `guerra` | guerra |
 
@@ -53,8 +53,9 @@ La `epoca` va del 1 al 14 porque en el juego hay 14 épocas, desde la Prehistori
 - Cada instrucción termina en `;`.
 - No se puede usar una unidad sin reclutarla antes.
 - No se puede reclutar dos veces la misma unidad.
-- El valor tiene que ser del tipo de la unidad. A una `moral` sí se le puede poner un entero.
+- El valor tiene que ser del tipo de la unidad.
 - Una `epoca` solo puede valer de 1 a 14.
+- Una `moral` solo puede valer de 0 a 5.
 - Los nombres no pueden empezar con número ni llevar tildes o ñ.
 - Los comentarios empiezan con `#`.
 

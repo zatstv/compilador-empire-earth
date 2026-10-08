@@ -55,8 +55,8 @@ static void value_text(const Symbol *symbol, char *buffer, size_t size) {
   }
   switch (symbol->type) {
   case TYPE_RECURSO:
-  case TYPE_EPOCA: snprintf(buffer, size, "%ld", symbol->value.intValue); break;
-  case TYPE_MORAL: snprintf(buffer, size, "%.2f", symbol->value.floatValue); break;
+  case TYPE_EPOCA:
+  case TYPE_MORAL: snprintf(buffer, size, "%ld", symbol->value.intValue); break;
   case TYPE_HEROE: snprintf(buffer, size, "\"%s\"", symbol->value.strValue); break;
   case TYPE_ALIADO: snprintf(buffer, size, "%s", symbol->value.boolValue ? "paz" : "guerra"); break;
   case TYPE_UNKNOWN: snprintf(buffer, size, "?"); break;
