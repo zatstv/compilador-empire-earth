@@ -1,0 +1,14 @@
+fundar_ciudad
+    reclutar recurso comida, madera, oro;
+    reclutar epoca era <- 1;
+    reclutar moral animo;
+    reclutar heroe lider <- "Alejandro";
+    reclutar aliado vecino;
+
+    comida <- 200;
+    madera <- 150;
+    oro    <- comida;
+    era    <- 5;
+    animo  <- 1.75;
+    vecino <- paz;
+victoria
