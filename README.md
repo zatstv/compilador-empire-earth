@@ -1,5 +1,7 @@
 # Compilador Empire Earth
 
+![Empire Earth](img/portada.jpg)
+
 Proyecto final de Compiladores (IS-581). Es un compilador para un lenguaje que inventé basado en el juego Empire Earth. Las variables son "unidades" que se reclutan y cada tipo de dato es algo del juego.
 
 Está hecho en C con Flex y Bison.
@@ -36,6 +38,15 @@ victoria
 | moral | números con decimales | 0.0 |
 | heroe | texto entre comillas | "" |
 | aliado | `paz` o `guerra` | guerra |
+
+La `epoca` va del 1 al 14 porque en el juego hay 14 épocas, desde la Prehistoria hasta la Era Nano.
+
+| | |
+|---|---|
+| ![Edad del Cobre](img/edad_cobre.jpg) | ![Edad Media](img/edad_media.jpg) |
+| Edad del Cobre | Edad Media |
+| ![Segunda Guerra Mundial](img/segunda_guerra.jpg) | ![Era Nano](img/era_nano.jpg) |
+| Segunda Guerra Mundial | Era Nano |
 
 ### Reglas
 
@@ -77,3 +88,12 @@ Para borrar lo compilado:
 ```
 make clean
 ```
+
+## Capturas del juego
+
+| | |
+|---|---|
+| ![](img/menu.jpg) | ![](img/ejercito.jpg) |
+| ![](img/heroe.jpg) | ![](img/batalla_naval.jpg) |
+| ![](img/primera_guerra.jpg) | ![](img/ciudad_nano.jpg) |
+| ![](img/civilizacion.jpg) | ![](img/editor.jpg) |
