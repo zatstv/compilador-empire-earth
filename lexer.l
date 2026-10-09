@@ -9,7 +9,12 @@
 int show_tokens = 0;
 int lexical_errors = 0;
 int previous_token_line = 0;
+int previous_token = 0;
+int open_braces = 0;
+int open_parens = 0;
+int parens_before_semicolon = 0;
 static int last_token_line = 0;
+static int last_token = 0;
 
 static void print_token(const char *name) {
     printf("  linea %-3d %-22s %s\n", yylineno, name, yytext);
@@ -18,6 +23,8 @@ static void print_token(const char *name) {
 #define TOKEN(t) do {                         \
         previous_token_line = last_token_line; \
         last_token_line = yylineno;            \
+        previous_token = last_token;           \
+        last_token = t;                        \
         if (show_tokens) print_token(#t);      \
         return t;                              \
     } while (0)
@@ -40,6 +47,9 @@ static void lexical_error(const char *message) {
 "fundar_ciudad"        { yylval.line = yylineno; TOKEN(TOKEN_PROGRAM_START); }
 "victoria"             { yylval.line = yylineno; TOKEN(TOKEN_PROGRAM_END); }
 "reclutar"             { yylval.line = yylineno; TOKEN(TOKEN_RECRUIT); }
+"estrategia"           { yylval.line = yylineno; TOKEN(TOKEN_FUNCTION); }
+"tributo"              { yylval.line = yylineno; TOKEN(TOKEN_RETURN); }
+"nada"                 { yylval.line = yylineno; TOKEN(TOKEN_NOTHING); }
 
 "recurso"              { yylval.type.value = TYPE_RECURSO; yylval.type.line = yylineno; TOKEN(TOKEN_TYPE); }
 "epoca"                { yylval.type.value = TYPE_EPOCA;   yylval.type.line = yylineno; TOKEN(TOKEN_TYPE); }
@@ -51,9 +61,18 @@ static void lexical_error(const char *message) {
 "guerra"               { yylval.boolean.value = 0; yylval.boolean.line = yylineno; TOKEN(TOKEN_BOOL_LITERAL); }
 
 "<-"                   { yylval.line = yylineno; TOKEN(TOKEN_ARROW); }
-";"                    { TOKEN(';'); }
+";"                    { parens_before_semicolon = open_parens; open_parens = 0; TOKEN(';'); }
 "="                    { TOKEN('='); }
 ","                    { TOKEN(','); }
+":"                    { TOKEN(':'); }
+"("                    { open_parens++; TOKEN('('); }
+")"                    { open_parens--; TOKEN(')'); }
+"{"                    { open_braces++; TOKEN('{'); }
+"}"                    { open_braces--; TOKEN('}'); }
+"+"                    { TOKEN('+'); }
+"-"                    { TOKEN('-'); }
+"*"                    { TOKEN('*'); }
+"/"                    { TOKEN('/'); }
 
 \"[^"\n]*\"            {
                          /* Strip quotes */

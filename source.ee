@@ -5,10 +5,23 @@ fundar_ciudad
     reclutar heroe lider <- "Alejandro";
     reclutar aliado vecino;
 
+    estrategia juntar(recurso a, recurso b): recurso {
+        tributo a + b;
+    }
+
+    estrategia avanzar(epoca actual): epoca {
+        tributo actual + 1;
+    }
+
+    estrategia firmar_paz(heroe nombre): nada {
+        lider <- nombre;
+        vecino <- paz;
+    }
+
     comida <- 200;
     madera <- 150;
-    oro    <- comida;
-    era    <- 5;
+    oro    <- juntar(comida, madera) * 2;
+    era    <- avanzar(5);
     animo  <- 3;
-    vecino <- paz;
+    firmar_paz("Carlomagno");
 victoria
