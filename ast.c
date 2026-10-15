@@ -116,6 +116,20 @@ ASTNode *create_return_node(ASTNode *value, int line) {
   return node;
 }
 
+ASTNode *create_block_decl(NodeType type, const char *name, ASTNode *body, int line) {
+  ASTNode *node = allocate_new_node(type, line);
+  node->data.block.identifier = string_copy(name);
+  node->data.block.body = body;
+  return node;
+}
+
+ASTNode *create_world_item(NodeType type, const char *word, ASTNode *amount, int line) {
+  ASTNode *node = allocate_new_node(type, line);
+  node->data.worldItem.word = word ? string_copy(word) : NULL;
+  node->data.worldItem.amount = amount;
+  return node;
+}
+
 ASTNode *create_binary_node(BinaryOperator op, ASTNode *left, ASTNode *right, int line) {
   ASTNode *node = allocate_new_node(BINARY_OP, line);
   node->data.binary.op = op;
@@ -161,14 +175,14 @@ const char *binary_operator_name(BinaryOperator op) {
 static int row_number;
 
 static void table_line(void) {
-  printf("+-----+-------+--------------------------------+------------+--------------+------------------+\n");
+  printf("+-----+-------+--------------------------------+------------+------------------+------------------+\n");
 }
 
 static void table_row(int line, int depth, const char *node, const char *type, const char *name,
                       const char *value) {
   char text[64];
   snprintf(text, sizeof(text), "%*s%s%s", depth * 2, "", depth > 0 ? "+- " : "", node);
-  printf("| %-3d | %-5d | %-30s | %-10s | %-12s | %-16s |\n", ++row_number, line, text,
+  printf("| %-3d | %-5d | %-30s | %-10s | %-16s | %-16s |\n", ++row_number, line, text,
          type, name, value);
 }
 
@@ -239,6 +253,27 @@ static void statement_rows(const ASTNode *node, int depth) {
       }
     } else if (node->type == FUNCTION_CALL) {
       expression_rows(node, depth);
+    } else if (node->type == WORLD_DECL || node->type == EMPIRE_DECL) {
+      table_row(node->line, depth, node->type == WORLD_DECL ? "Mundo" : "Imperio", "-",
+                node->data.block.identifier, "");
+      statement_rows(node->data.block.body, depth + 1);
+    } else {
+      const WorldItem *item = &node->data.worldItem;
+      const char *name = "?";
+      switch (node->type) {
+      case SIZE_STMT: name = "Tamano"; break;
+      case TERRAIN_STMT: name = "Terreno"; break;
+      case WATER_STMT: name = "Agua"; break;
+      case POPULATE_STMT: name = "Poblar"; break;
+      case TREASURE_STMT: name = "Tesoro"; break;
+      default: break;
+      }
+      if (item->amount == NULL) {
+        table_row(node->line, depth, name, "-", "-", item->word);
+      } else {
+        table_row(node->line, depth, name, "-", item->word ? item->word : "-", "");
+        expression_rows(item->amount, depth + 1);
+      }
     }
   }
 }
@@ -246,7 +281,7 @@ static void statement_rows(const ASTNode *node, int depth) {
 void print_ast_table(const ASTNode *node) {
   row_number = 0;
   table_line();
-  printf("| %-3s | %-5s | %-30s | %-10s | %-12s | %-16s |\n", "#", "Linea", "Nodo", "Tipo",
+  printf("| %-3s | %-5s | %-30s | %-10s | %-16s | %-16s |\n", "#", "Linea", "Nodo", "Tipo",
          "Nombre", "Valor");
   table_line();
   statement_rows(node, 0);
@@ -293,6 +328,19 @@ void free_ast(ASTNode *node) {
       break;
     case RETURN_STMT:
       free_ast(node->data.returnStatement.value);
+      break;
+    case WORLD_DECL:
+    case EMPIRE_DECL:
+      free(node->data.block.identifier);
+      free_ast(node->data.block.body);
+      break;
+    case SIZE_STMT:
+    case TERRAIN_STMT:
+    case WATER_STMT:
+    case POPULATE_STMT:
+    case TREASURE_STMT:
+      free(node->data.worldItem.word);
+      free_ast(node->data.worldItem.amount);
       break;
     case BINARY_OP:
       free_ast(node->data.binary.left);

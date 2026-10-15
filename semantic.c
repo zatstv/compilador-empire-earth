@@ -1,5 +1,7 @@
 #include "semantic.h"
 
+#include "string_utils.h"
+
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -137,6 +139,10 @@ static ValueKind check_expression(ASTNode *expr, SymbolTable *table) {
       defeat(expr->line, "'%s' es una estrategia, se usa con ( )", expr->data.identifier);
       return VALUE_NONE;
     }
+    if (source->kind == SYMBOL_EMPIRE) {
+      defeat(expr->line, "'%s' es un imperio y no guarda ningun valor", expr->data.identifier);
+      return VALUE_NONE;
+    }
     expr->valueKind = kind_of_type(source->type);
     break;
   }
@@ -220,6 +226,56 @@ static void check_function(ASTNode *node, SymbolTable *table) {
   symbol->visible = 1;
 }
 
+static void check_world_item(ASTNode *item, SymbolTable *table) {
+  const char *name = item->data.worldItem.word;
+  SymbolKind kind = SYMBOL_SETTING;
+  switch (item->type) {
+  case SIZE_STMT: name = "tamano"; break;
+  case TERRAIN_STMT: name = "terreno"; break;
+  case WATER_STMT: name = "agua"; break;
+  case POPULATE_STMT: kind = SYMBOL_POPULATE; break;
+  case TREASURE_STMT: kind = SYMBOL_TREASURE; break;
+  default: break;
+  }
+
+  ASTNode *amount = item->data.worldItem.amount;
+  if (amount != NULL) {
+    check_value(TYPE_RECURSO, amount, table);
+  }
+  Symbol *symbol = symbol_table_insert(table, name, amount ? TYPE_RECURSO : TYPE_UNKNOWN, kind,
+                                       item->line);
+  if (symbol == NULL) {
+    defeat(item->line, "no hay memoria para '%s'", name);
+    return;
+  }
+  symbol->item = item;
+  symbol->visible = 0;
+  if (amount == NULL) {
+    symbol->value.strValue = string_copy(item->data.worldItem.word);
+    symbol->hasValue = 1;
+  }
+}
+
+static void check_block(ASTNode *node, SymbolTable *table) {
+  const BlockDeclaration *block = &node->data.block;
+  const Symbol *existing = symbol_table_lookup_current(table, block->identifier);
+  if (existing != NULL) {
+    defeat(node->line, "'%s' ya existe desde la linea %d", block->identifier, existing->line);
+    return;
+  }
+  SymbolKind kind = node->type == WORLD_DECL ? SYMBOL_WORLD : SYMBOL_EMPIRE;
+  if (symbol_table_insert(table, block->identifier, TYPE_UNKNOWN, kind, node->line) == NULL) {
+    defeat(node->line, "no hay memoria para '%s'", block->identifier);
+    return;
+  }
+
+  symbol_table_enter_scope(table, block->identifier);
+  for (ASTNode *item = block->body; item != NULL; item = item->next) {
+    check_world_item(item, table);
+  }
+  symbol_table_exit_scope(table);
+}
+
 static void check_statement(ASTNode *node, SymbolTable *table) {
   if (node->type == VAR_DECL) {
     VarDeclaration *decl = &node->data.varDeclaration;
@@ -245,11 +301,17 @@ static void check_statement(ASTNode *node, SymbolTable *table) {
       defeat(node->line, "'%s' es una estrategia y no se le puede asignar", assign->identifier);
       return;
     }
+    if (target->kind == SYMBOL_EMPIRE) {
+      defeat(node->line, "'%s' es un imperio y no se le puede asignar", assign->identifier);
+      return;
+    }
     check_value(target->type, assign->value, table);
   } else if (node->type == FUNCTION_DECL) {
     check_function(node, table);
   } else if (node->type == FUNCTION_CALL) {
     check_call(node, table);
+  } else if (node->type == WORLD_DECL || node->type == EMPIRE_DECL) {
+    check_block(node, table);
   } else if (node->type == RETURN_STMT) {
     ASTNode *value = node->data.returnStatement.value;
     if (value == NULL && current_function->returnType != TYPE_NADA) {

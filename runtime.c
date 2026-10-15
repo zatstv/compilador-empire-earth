@@ -18,6 +18,7 @@ typedef struct RuntimeVariable {
 } RuntimeVariable;
 
 static const ASTNode *program_root;
+static SymbolTable *symbols;
 static RuntimeVariable *global_variables;
 
 static RuntimeVariable *find_variable(RuntimeVariable *variables, const char *name) {
@@ -177,6 +178,25 @@ static int evaluate(const ASTNode *expr, RuntimeVariable *variables, RuntimeValu
   }
 }
 
+static int execute_block(const ASTNode *node, RuntimeVariable *variables) {
+  for (const ASTNode *item = node->data.block.body; item != NULL; item = item->next) {
+    const ASTNode *amount = item->data.worldItem.amount;
+    RuntimeValue value;
+    if (amount == NULL) continue;
+    const char *name = item->type == WATER_STMT ? "agua" : item->data.worldItem.word;
+    if (!evaluate(amount, variables, &value) || !fits(TYPE_RECURSO, &value, amount->line, name)) {
+      return 0;
+    }
+    for (Symbol *symbol = symbols->head; symbol != NULL; symbol = symbol->next) {
+      if (symbol->item == item) {
+        symbol->value = value.data;
+        symbol->hasValue = 1;
+      }
+    }
+  }
+  return 1;
+}
+
 static int execute_statement(const ASTNode *node, RuntimeVariable **variables) {
   RuntimeValue value;
   switch (node->type) {
@@ -201,6 +221,9 @@ static int execute_statement(const ASTNode *node, RuntimeVariable **variables) {
   }
   case FUNCTION_CALL:
     return call_function(node, *variables, &value);
+  case WORLD_DECL:
+  case EMPIRE_DECL:
+    return execute_block(node, *variables);
   default:
     return 1;
   }
@@ -221,6 +244,7 @@ static void save_globals(SymbolTable *table) {
 int execute_program(const ASTNode *program, SymbolTable *table) {
   int succeeded = 1;
   program_root = program;
+  symbols = table;
   global_variables = NULL;
   for (const ASTNode *node = program; node != NULL; node = node->next) {
     if (!execute_statement(node, &global_variables)) {

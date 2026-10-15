@@ -13,6 +13,8 @@ int previous_token = 0;
 int open_braces = 0;
 int open_parens = 0;
 int parens_before_semicolon = 0;
+int current_block = 0;
+static int pending_block = 0;
 static int last_token_line = 0;
 static int last_token = 0;
 
@@ -47,9 +49,16 @@ static void lexical_error(const char *message) {
 "fundar_ciudad"        { yylval.line = yylineno; TOKEN(TOKEN_PROGRAM_START); }
 "victoria"             { yylval.line = yylineno; TOKEN(TOKEN_PROGRAM_END); }
 "reclutar"             { yylval.line = yylineno; TOKEN(TOKEN_RECRUIT); }
-"estrategia"           { yylval.line = yylineno; TOKEN(TOKEN_FUNCTION); }
+"estrategia"           { pending_block = TOKEN_FUNCTION; yylval.line = yylineno; TOKEN(TOKEN_FUNCTION); }
 "tributo"              { yylval.line = yylineno; TOKEN(TOKEN_RETURN); }
 "nada"                 { yylval.line = yylineno; TOKEN(TOKEN_NOTHING); }
+"mundo"                { pending_block = TOKEN_WORLD; yylval.line = yylineno; TOKEN(TOKEN_WORLD); }
+"imperio"              { pending_block = TOKEN_EMPIRE; yylval.line = yylineno; TOKEN(TOKEN_EMPIRE); }
+"tamano"               { yylval.line = yylineno; TOKEN(TOKEN_SIZE); }
+"terreno"              { yylval.line = yylineno; TOKEN(TOKEN_TERRAIN); }
+"agua"                 { yylval.line = yylineno; TOKEN(TOKEN_WATER); }
+"poblar"               { yylval.line = yylineno; TOKEN(TOKEN_POPULATE); }
+"tesoro"               { yylval.line = yylineno; TOKEN(TOKEN_TREASURE); }
 
 "recurso"              { yylval.type.value = TYPE_RECURSO; yylval.type.line = yylineno; TOKEN(TOKEN_TYPE); }
 "epoca"                { yylval.type.value = TYPE_EPOCA;   yylval.type.line = yylineno; TOKEN(TOKEN_TYPE); }
@@ -67,7 +76,7 @@ static void lexical_error(const char *message) {
 ":"                    { TOKEN(':'); }
 "("                    { open_parens++; TOKEN('('); }
 ")"                    { open_parens--; TOKEN(')'); }
-"{"                    { open_braces++; TOKEN('{'); }
+"{"                    { open_braces++; current_block = pending_block; TOKEN('{'); }
 "}"                    { open_braces--; TOKEN('}'); }
 "+"                    { TOKEN('+'); }
 "-"                    { TOKEN('-'); }

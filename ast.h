@@ -31,6 +31,13 @@ typedef enum {
   ASSIGNMENT,
   FUNCTION_DECL,
   RETURN_STMT,
+  WORLD_DECL,
+  EMPIRE_DECL,
+  SIZE_STMT,
+  TERRAIN_STMT,
+  WATER_STMT,
+  POPULATE_STMT,
+  TREASURE_STMT,
 
   INT_LITERAL,
   FLOAT_LITERAL,
@@ -66,6 +73,16 @@ typedef struct FunctionDeclaration {
   struct ASTNode *body;
 } FunctionDeclaration;
 
+typedef struct BlockDeclaration {
+  char *identifier;
+  struct ASTNode *body;
+} BlockDeclaration;
+
+typedef struct WorldItem {
+  char *word;
+  struct ASTNode *amount;
+} WorldItem;
+
 typedef struct ASTNode {
   NodeType type;
   int line;
@@ -74,6 +91,8 @@ typedef struct ASTNode {
     VarDeclaration varDeclaration;
     Assignment assignment;
     FunctionDeclaration functionDeclaration;
+    BlockDeclaration block;
+    WorldItem worldItem;
     long intValue;
     double floatValue;
     char *strValue;
@@ -110,6 +129,8 @@ ASTNode *create_function_decl(DataType return_type, const char *name,
                               FunctionParameter *parameters, ASTNode *body, int line);
 ASTNode *create_function_call(const char *name, ASTNode *arguments, int line);
 ASTNode *create_return_node(ASTNode *value, int line);
+ASTNode *create_block_decl(NodeType type, const char *name, ASTNode *body, int line);
+ASTNode *create_world_item(NodeType type, const char *word, ASTNode *amount, int line);
 ASTNode *create_binary_node(BinaryOperator op, ASTNode *left, ASTNode *right, int line);
 
 const char *data_type_name(DataType type);

@@ -65,6 +65,7 @@ Symbol *symbol_table_insert(SymbolTable *table, const char *name, DataType type,
   symbol->hasValue = 0;
   symbol->value.intValue = 0;
   symbol->function = NULL;
+  symbol->item = NULL;
   symbol->next = NULL;
 
   if (table->head == NULL) {
@@ -84,6 +85,10 @@ static void value_text(const Symbol *symbol, char *buffer, size_t size) {
     snprintf(buffer, size, "-");
     return;
   }
+  if (symbol->kind == SYMBOL_SETTING && symbol->type == TYPE_UNKNOWN) {
+    snprintf(buffer, size, "%s", symbol->value.strValue);
+    return;
+  }
   switch (symbol->type) {
   case TYPE_RECURSO:
   case TYPE_EPOCA:
@@ -100,26 +105,32 @@ static const char *kind_name(SymbolKind kind) {
   case SYMBOL_UNIT: return "unidad";
   case SYMBOL_PARAMETER: return "parametro";
   case SYMBOL_FUNCTION: return "estrategia";
+  case SYMBOL_WORLD: return "mundo";
+  case SYMBOL_EMPIRE: return "imperio";
+  case SYMBOL_SETTING: return "ajuste";
+  case SYMBOL_POPULATE: return "poblar";
+  case SYMBOL_TREASURE: return "tesoro";
   }
   return "?";
 }
 
 void symbol_table_print(const SymbolTable *table) {
-  const char *line = "+-----+--------------+------------+----------+--------------+------------+------------------+\n";
+  const char *line = "+-----+------------------+------------+----------+------------------+------------+------------------+\n";
   int number = 0;
   char value[64];
   printf("%s", line);
-  printf("| %-3s | %-12s | %-10s | %-8s | %-12s | %-10s | %-16s |\n", "#", "Nombre", "Clase",
+  printf("| %-3s | %-16s | %-10s | %-8s | %-16s | %-10s | %-16s |\n", "#", "Nombre", "Clase",
          "Tipo", "Ambito", "Linea", "Valor");
   printf("%s", line);
   for (const Symbol *symbol = table->head; symbol != NULL; symbol = symbol->next) {
     value_text(symbol, value, sizeof(value));
-    printf("| %-3d | %-12s | %-10s | %-8s | %-12s | linea %-4d | %-16s |\n", ++number,
-           symbol->name, kind_name(symbol->kind), data_type_name(symbol->type),
+    printf("| %-3d | %-16s | %-10s | %-8s | %-16s | linea %-4d | %-16s |\n", ++number,
+           symbol->name, kind_name(symbol->kind),
+           symbol->type == TYPE_UNKNOWN ? "-" : data_type_name(symbol->type),
            symbol->scopeName, symbol->line, value);
   }
   if (number == 0) {
-    printf("| %-89s |\n", "(no se recluto ninguna unidad)");
+    printf("| %-97s |\n", "(no se recluto ninguna unidad)");
   }
   printf("%s", line);
 }
@@ -128,7 +139,8 @@ void symbol_table_destroy(SymbolTable *table) {
   Symbol *symbol = table->head;
   while (symbol != NULL) {
     Symbol *next = symbol->next;
-    if (symbol->type == TYPE_HEROE && symbol->hasValue) {
+    if (symbol->hasValue && (symbol->type == TYPE_HEROE ||
+                             (symbol->kind == SYMBOL_SETTING && symbol->type == TYPE_UNKNOWN))) {
       free(symbol->value.strValue);
     }
     free(symbol->name);

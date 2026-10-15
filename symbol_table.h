@@ -6,7 +6,12 @@
 typedef enum {
   SYMBOL_UNIT,
   SYMBOL_PARAMETER,
-  SYMBOL_FUNCTION
+  SYMBOL_FUNCTION,
+  SYMBOL_WORLD,
+  SYMBOL_EMPIRE,
+  SYMBOL_SETTING,
+  SYMBOL_POPULATE,
+  SYMBOL_TREASURE
 } SymbolKind;
 
 typedef union {
@@ -27,6 +32,7 @@ typedef struct Symbol {
   int hasValue;
   SymbolValue value;
   const ASTNode *function;
+  const ASTNode *item;
   struct Symbol *next;
 } Symbol;
 
