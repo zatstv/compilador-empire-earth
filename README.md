@@ -6,6 +6,8 @@ Proyecto final de Compiladores (IS-581). Es un compilador para un lenguaje que i
 
 Está hecho en C con Flex y Bison.
 
+La meta es que con el lenguaje se pueda escribir un mundo completo (el mapa y con qué empieza cada jugador) y que el compilador lo convierta en un mapa que el juego de verdad pueda abrir en Mapa aleatorio.
+
 ## El lenguaje
 
 Todo programa empieza con `fundar_ciudad` y termina con `victoria`.
@@ -49,6 +51,32 @@ firmar_paz("Carlomagno");
 
 Con los números se puede sumar, restar, multiplicar y dividir (`+ - * /`).
 
+### Mundo e imperios
+
+Con `mundo` se describe el mapa y con `imperio` lo que tiene cada jugador al empezar.
+
+```
+mundo "Tierra de Hugo" {
+    tamano mediano;
+    terreno pradera;
+    agua 0;
+}
+
+imperio hugo {
+    poblar ciudadano juntar(5, 5);
+    tesoro oro 3;
+}
+
+imperio rival {
+    poblar ciudadano 5;
+    tesoro piedra 2;
+}
+```
+
+- `tamano`, `terreno` y `agua` van dentro del `mundo`.
+- `poblar` dice cuántas unidades de un tipo tiene el imperio y `tesoro` cuántas minas o recursos.
+- Las cantidades pueden ser números, unidades, cuentas o llamadas a estrategias.
+
 ### Tipos
 
 | Tipo | Qué guarda | Valor inicial |
@@ -84,6 +112,9 @@ La `epoca` va del 1 al 14 porque en el juego hay 14 épocas, desde la Prehistori
 - `tributo` solo se puede usar dentro de una estrategia.
 - Las unidades que se reclutan dentro de una estrategia solo existen ahí.
 - Un recurso no puede quedar negativo y no se puede dividir entre 0.
+- `tamano`, `terreno` y `agua` solo van dentro del `mundo`; `poblar` y `tesoro` solo dentro de un `imperio`.
+- No se puede crear un imperio dentro de otro ni repetir el nombre de un imperio.
+- Las cantidades de `poblar`, `tesoro` y `agua` son números enteros y no pueden quedar negativas.
 
 Si algo está mal el compilador muestra `DERROTA en la linea N:` y qué fue lo que pasó. Si todo sale bien muestra `VICTORIA`.
 
@@ -91,9 +122,19 @@ Si algo está mal el compilador muestra `DERROTA en la linea N:` y qué fue lo q
 
 1. Análisis léxico y sintáctico (`lexer.l` y `parser.y`)
 2. Arma el árbol de sintaxis (AST) y lo muestra como tabla (`ast.c`)
-3. Análisis semántico: revisa que las unidades y estrategias existan y que los tipos cuadren (`semantic.c`)
-4. Ejecuta el programa (`runtime.c`)
-5. Muestra la tabla de símbolos con las unidades, estrategias y parámetros, en qué ámbito están y el valor final (`symbol_table.c`)
+3. Análisis semántico: revisa que las unidades, estrategias e imperios existan y que los tipos cuadren (`semantic.c`)
+4. Ejecuta el programa y calcula lo que tiene cada imperio (`runtime.c`)
+5. Muestra la tabla de símbolos con las unidades, estrategias, parámetros, el mundo y los imperios, en qué ámbito están y el valor final (`symbol_table.c`)
+
+## Lo que falta
+
+- [x] Léxico, sintáctico, AST, tabla de símbolos, semántico y ejecución
+- [x] Estrategias (funciones)
+- [x] Mundo e imperios
+- [ ] Estructuras de control (`si` y `mientras`)
+- [ ] Generar el archivo `.rmv` del mapa y copiarlo a la carpeta del juego
+- [ ] Cosas distintas para cada jugador
+- [ ] Optimización sencilla y reporte final
 
 ## Cómo correrlo
 
