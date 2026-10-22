@@ -52,6 +52,8 @@ static void lexical_error(const char *message) {
 "estrategia"           { pending_block = TOKEN_FUNCTION; yylval.line = yylineno; TOKEN(TOKEN_FUNCTION); }
 "tributo"              { yylval.line = yylineno; TOKEN(TOKEN_RETURN); }
 "nada"                 { yylval.line = yylineno; TOKEN(TOKEN_NOTHING); }
+"si"                   { pending_block = TOKEN_IF; yylval.line = yylineno; TOKEN(TOKEN_IF); }
+"sino"                 { pending_block = TOKEN_IF; yylval.line = yylineno; TOKEN(TOKEN_ELSE); }
 "mundo"                { pending_block = TOKEN_WORLD; yylval.line = yylineno; TOKEN(TOKEN_WORLD); }
 "imperio"              { pending_block = TOKEN_EMPIRE; yylval.line = yylineno; TOKEN(TOKEN_EMPIRE); }
 "tamano"               { yylval.line = yylineno; TOKEN(TOKEN_SIZE); }
@@ -70,6 +72,12 @@ static void lexical_error(const char *message) {
 "guerra"               { yylval.boolean.value = 0; yylval.boolean.line = yylineno; TOKEN(TOKEN_BOOL_LITERAL); }
 
 "<-"                   { yylval.line = yylineno; TOKEN(TOKEN_ARROW); }
+"=="                   { TOKEN(TOKEN_EQ); }
+"!="                   { TOKEN(TOKEN_NE); }
+"<="                   { TOKEN(TOKEN_LE); }
+">="                   { TOKEN(TOKEN_GE); }
+"<"                    { TOKEN('<'); }
+">"                    { TOKEN('>'); }
 ";"                    { parens_before_semicolon = open_parens; open_parens = 0; TOKEN(';'); }
 "="                    { TOKEN('='); }
 ","                    { TOKEN(','); }

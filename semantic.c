@@ -161,6 +161,20 @@ static ValueKind check_expression(ASTNode *expr, SymbolTable *table) {
     if (left == VALUE_NONE || right == VALUE_NONE) {
       return VALUE_NONE;
     }
+    if (expr->data.binary.op >= OP_EQ) {
+      if (left != right) {
+        defeat(expr->line, "no se puede comparar %s con %s", value_kind_name(left),
+               value_kind_name(right));
+        return VALUE_NONE;
+      }
+      if (left != VALUE_INT && expr->data.binary.op != OP_EQ && expr->data.binary.op != OP_NE) {
+        defeat(expr->line, "el %s solo se puede usar con numeros enteros",
+               binary_operator_name(expr->data.binary.op));
+        return VALUE_NONE;
+      }
+      expr->valueKind = VALUE_BOOL;
+      break;
+    }
     if (left != VALUE_INT || right != VALUE_INT) {
       defeat(expr->line, "el %s solo se puede hacer con numeros enteros",
              binary_operator_name(expr->data.binary.op));
@@ -178,11 +192,36 @@ static ValueKind check_expression(ASTNode *expr, SymbolTable *table) {
 static int has_return(const ASTNode *body) {
   for (; body != NULL; body = body->next) {
     if (body->type == RETURN_STMT) return 1;
+    if (body->type == IF_STMT && has_return(body->data.ifStatement.thenBody) &&
+        has_return(body->data.ifStatement.elseBody)) {
+      return 1;
+    }
   }
   return 0;
 }
 
 static void check_statement(ASTNode *node, SymbolTable *table);
+
+static void check_if_body(ASTNode *body, const char *name, SymbolTable *table) {
+  const char *outer_scope = table->scopeName;
+  symbol_table_enter_scope(table, name);
+  for (; body != NULL; body = body->next) {
+    check_statement(body, table);
+  }
+  symbol_table_exit_scope(table);
+  table->scopeName = outer_scope;
+}
+
+static void check_if(ASTNode *node, SymbolTable *table) {
+  ASTNode *condition = node->data.ifStatement.condition;
+  ValueKind kind = check_expression(condition, table);
+  if (kind != VALUE_NONE && kind != VALUE_BOOL) {
+    defeat(condition->line, "la condicion del si tiene que dar paz o guerra (dio %s)",
+           value_kind_name(kind));
+  }
+  check_if_body(node->data.ifStatement.thenBody, "si", table);
+  check_if_body(node->data.ifStatement.elseBody, "sino", table);
+}
 
 static void check_function(ASTNode *node, SymbolTable *table) {
   const FunctionDeclaration *function = &node->data.functionDeclaration;
@@ -312,9 +351,13 @@ static void check_statement(ASTNode *node, SymbolTable *table) {
     check_call(node, table);
   } else if (node->type == WORLD_DECL || node->type == EMPIRE_DECL) {
     check_block(node, table);
+  } else if (node->type == IF_STMT) {
+    check_if(node, table);
   } else if (node->type == RETURN_STMT) {
     ASTNode *value = node->data.returnStatement.value;
-    if (value == NULL && current_function->returnType != TYPE_NADA) {
+    if (current_function == NULL) {
+      defeat(node->line, "tributo solo se usa dentro de una estrategia");
+    } else if (value == NULL && current_function->returnType != TYPE_NADA) {
       defeat(node->line, "la estrategia '%s' tiene que entregar tributo de tipo %s",
              current_function->identifier, data_type_name(current_function->returnType));
     } else if (value != NULL && current_function->returnType == TYPE_NADA) {

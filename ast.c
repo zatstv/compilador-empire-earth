@@ -138,6 +138,14 @@ ASTNode *create_binary_node(BinaryOperator op, ASTNode *left, ASTNode *right, in
   return node;
 }
 
+ASTNode *create_if_node(ASTNode *condition, ASTNode *then_body, ASTNode *else_body, int line) {
+  ASTNode *node = allocate_new_node(IF_STMT, line);
+  node->data.ifStatement.condition = condition;
+  node->data.ifStatement.thenBody = then_body;
+  node->data.ifStatement.elseBody = else_body;
+  return node;
+}
+
 const char *data_type_name(DataType type) {
   switch (type) {
   case TYPE_RECURSO: return "recurso";
@@ -168,6 +176,12 @@ const char *binary_operator_name(BinaryOperator op) {
   case OP_SUB: return "-";
   case OP_MUL: return "*";
   case OP_DIV: return "/";
+  case OP_EQ: return "==";
+  case OP_NE: return "!=";
+  case OP_GT: return ">";
+  case OP_LT: return "<";
+  case OP_GE: return ">=";
+  case OP_LE: return "<=";
   }
   return "?";
 }
@@ -208,7 +222,7 @@ static void expression_rows(const ASTNode *expr, int depth) {
   case STR_LITERAL: node = "Literal texto"; break;
   case BOOL_LITERAL: node = "Literal paz/guerra"; break;
   case IDENTIFIER_REF: node = "Uso de variable"; name = expr->data.identifier; break;
-  case BINARY_OP: node = "Operacion"; break;
+  case BINARY_OP: node = expr->data.binary.op >= OP_EQ ? "Comparacion" : "Operacion"; break;
   case FUNCTION_CALL: node = "Llamada a estrategia"; name = expr->data.functionCall.identifier; break;
   default: break;
   }
@@ -257,6 +271,16 @@ static void statement_rows(const ASTNode *node, int depth) {
       table_row(node->line, depth, node->type == WORLD_DECL ? "Mundo" : "Imperio", "-",
                 node->data.block.identifier, "");
       statement_rows(node->data.block.body, depth + 1);
+    } else if (node->type == IF_STMT) {
+      table_row(node->line, depth, "Si (if)", "-", "-", "");
+      expression_rows(node->data.ifStatement.condition, depth + 1);
+      table_row(node->line, depth + 1, "Entonces", "-", "-",
+                node->data.ifStatement.thenBody ? "" : "(vacio)");
+      statement_rows(node->data.ifStatement.thenBody, depth + 2);
+      if (node->data.ifStatement.elseBody != NULL) {
+        table_row(node->data.ifStatement.elseBody->line, depth + 1, "Sino (else)", "-", "-", "");
+        statement_rows(node->data.ifStatement.elseBody, depth + 2);
+      }
     } else {
       const WorldItem *item = &node->data.worldItem;
       const char *name = "?";
@@ -345,6 +369,11 @@ void free_ast(ASTNode *node) {
     case BINARY_OP:
       free_ast(node->data.binary.left);
       free_ast(node->data.binary.right);
+      break;
+    case IF_STMT:
+      free_ast(node->data.ifStatement.condition);
+      free_ast(node->data.ifStatement.thenBody);
+      free_ast(node->data.ifStatement.elseBody);
       break;
     case INT_LITERAL:
     case FLOAT_LITERAL:

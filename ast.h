@@ -24,6 +24,12 @@ typedef enum {
   OP_SUB,
   OP_MUL,
   OP_DIV,
+  OP_EQ,
+  OP_NE,
+  OP_GT,
+  OP_LT,
+  OP_GE,
+  OP_LE,
 } BinaryOperator;
 
 typedef enum {
@@ -38,6 +44,7 @@ typedef enum {
   WATER_STMT,
   POPULATE_STMT,
   TREASURE_STMT,
+  IF_STMT,
 
   INT_LITERAL,
   FLOAT_LITERAL,
@@ -110,6 +117,11 @@ typedef struct ASTNode {
     struct {
       struct ASTNode *value;
     } returnStatement;
+    struct {
+      struct ASTNode *condition;
+      struct ASTNode *thenBody;
+      struct ASTNode *elseBody;
+    } ifStatement;
   } data;
 
   struct ASTNode *next; // Linked list for multiple statements
@@ -132,6 +144,7 @@ ASTNode *create_return_node(ASTNode *value, int line);
 ASTNode *create_block_decl(NodeType type, const char *name, ASTNode *body, int line);
 ASTNode *create_world_item(NodeType type, const char *word, ASTNode *amount, int line);
 ASTNode *create_binary_node(BinaryOperator op, ASTNode *left, ASTNode *right, int line);
+ASTNode *create_if_node(ASTNode *condition, ASTNode *then_body, ASTNode *else_body, int line);
 
 const char *data_type_name(DataType type);
 const char *value_kind_name(ValueKind kind);

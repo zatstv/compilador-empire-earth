@@ -94,6 +94,8 @@ static int fits(DataType type, const RuntimeValue *value, int line, const char *
 
 static int evaluate(const ASTNode *expr, RuntimeVariable *variables, RuntimeValue *result);
 static int execute_statement(const ASTNode *node, RuntimeVariable **variables);
+static int execute_if(const ASTNode *node, RuntimeVariable **variables, const ASTNode *call,
+                      const FunctionDeclaration *function, RuntimeValue *result, int *returned);
 
 static int bind_parameters(const FunctionDeclaration *function, const ASTNode *arguments,
                            RuntimeVariable *caller_variables, RuntimeVariable **variables) {
@@ -110,19 +112,44 @@ static int bind_parameters(const FunctionDeclaration *function, const ASTNode *a
   return 1;
 }
 
-static int execute_body(const ASTNode *call, const FunctionDeclaration *function,
-                        RuntimeVariable **variables, RuntimeValue *result) {
-  for (const ASTNode *node = function->body; node != NULL; node = node->next) {
+static int execute_list(const ASTNode *node, RuntimeVariable **variables, const ASTNode *call,
+                        const FunctionDeclaration *function, RuntimeValue *result,
+                        int *returned) {
+  for (; node != NULL; node = node->next) {
     if (node->type == RETURN_STMT) {
+      *returned = 1;
       if (node->data.returnStatement.value == NULL) {
         return 1;
       }
       return evaluate(node->data.returnStatement.value, *variables, result) &&
              fits(function->returnType, result, call->line, function->identifier);
     }
+    if (node->type == IF_STMT) {
+      if (!execute_if(node, variables, call, function, result, returned)) return 0;
+      if (*returned) return 1;
+      continue;
+    }
     if (!execute_statement(node, variables)) return 0;
   }
   return 1;
+}
+
+static int execute_if(const ASTNode *node, RuntimeVariable **variables, const ASTNode *call,
+                      const FunctionDeclaration *function, RuntimeValue *result, int *returned) {
+  RuntimeValue condition;
+  if (!evaluate(node->data.ifStatement.condition, *variables, &condition)) return 0;
+  const ASTNode *body = condition.data.boolValue ? node->data.ifStatement.thenBody
+                                                 : node->data.ifStatement.elseBody;
+  RuntimeVariable *block_start = *variables;
+  int succeeded = execute_list(body, variables, call, function, result, returned);
+  release_variables_until(variables, block_start);
+  return succeeded;
+}
+
+static int execute_body(const ASTNode *call, const FunctionDeclaration *function,
+                        RuntimeVariable **variables, RuntimeValue *result) {
+  int returned = 0;
+  return execute_list(function->body, variables, call, function, result, &returned);
 }
 
 static int call_function(const ASTNode *call, RuntimeVariable *caller_variables,
@@ -137,6 +164,27 @@ static int call_function(const ASTNode *call, RuntimeVariable *caller_variables,
                   execute_body(call, function, &variables, result);
   release_variables_until(&variables, frame_start);
   return succeeded;
+}
+
+static int compare(BinaryOperator op, const RuntimeValue *left, const RuntimeValue *right) {
+  long order;
+  if (left->kind == VALUE_TEXT) {
+    order = strcmp(left->data.strValue, right->data.strValue);
+  } else if (left->kind == VALUE_BOOL) {
+    order = left->data.boolValue - right->data.boolValue;
+  } else {
+    order = (left->data.intValue > right->data.intValue) -
+            (left->data.intValue < right->data.intValue);
+  }
+  switch (op) {
+  case OP_EQ: return order == 0;
+  case OP_NE: return order != 0;
+  case OP_GT: return order > 0;
+  case OP_LT: return order < 0;
+  case OP_GE: return order >= 0;
+  case OP_LE: return order <= 0;
+  default: return 0;
+  }
 }
 
 static int evaluate(const ASTNode *expr, RuntimeVariable *variables, RuntimeValue *result) {
@@ -169,6 +217,14 @@ static int evaluate(const ASTNode *expr, RuntimeVariable *variables, RuntimeValu
         return 0;
       }
       result->data.intValue = a / b;
+      break;
+    case OP_EQ:
+    case OP_NE:
+    case OP_GT:
+    case OP_LT:
+    case OP_GE:
+    case OP_LE:
+      result->data.boolValue = compare(expr->data.binary.op, &left, &right);
       break;
     }
     return 1;
@@ -224,6 +280,10 @@ static int execute_statement(const ASTNode *node, RuntimeVariable **variables) {
   case WORLD_DECL:
   case EMPIRE_DECL:
     return execute_block(node, *variables);
+  case IF_STMT: {
+    int returned = 0;
+    return execute_if(node, variables, NULL, NULL, &value, &returned);
+  }
   default:
     return 1;
   }
