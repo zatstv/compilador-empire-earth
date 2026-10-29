@@ -77,6 +77,26 @@ imperio rival {
 - `poblar` dice cuántas unidades de un tipo tiene el imperio y `tesoro` cuántas minas o recursos.
 - Las cantidades pueden ser números, unidades, cuentas o llamadas a estrategias.
 
+### Listas
+
+Cualquier tipo se puede volver lista poniéndole `[]`. Las posiciones empiezan en 0.
+
+```
+reclutar recurso[] almacen <- [100, 250, 75];
+reclutar heroe[] heroes <- ["Alejandro", "Carlomagno"];
+reclutar epoca[] eras;
+
+almacen.agregar(500);
+oro <- almacen[0];
+oro <- almacen.quitar();
+oro <- almacen.largo();
+```
+
+- `agregar(x)` mete un valor al final de la lista.
+- `quitar()` saca el último y lo devuelve.
+- `largo()` dice cuántos tiene.
+- Una lista sin valor empieza vacía, y también se puede pasar a una estrategia.
+
 ### Tipos
 
 | Tipo | Qué guarda | Valor inicial |
@@ -131,6 +151,7 @@ Si algo está mal el compilador muestra `DERROTA en la linea N:` y qué fue lo q
 - [x] Léxico, sintáctico, AST, tabla de símbolos, semántico y ejecución
 - [x] Estrategias (funciones)
 - [x] Mundo e imperios
+- [x] Listas (arreglos)
 - [ ] Estructuras de control (`si` y `mientras`)
 - [ ] Generar el archivo `.rmv` del mapa y copiarlo a la carpeta del juego
 - [ ] Cosas distintas para cada jugador

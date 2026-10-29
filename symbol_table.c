@@ -95,6 +95,11 @@ static void value_text(const Symbol *symbol, char *buffer, size_t size) {
   case TYPE_MORAL: snprintf(buffer, size, "%ld", symbol->value.intValue); break;
   case TYPE_HEROE: snprintf(buffer, size, "\"%s\"", symbol->value.strValue); break;
   case TYPE_ALIADO: snprintf(buffer, size, "%s", symbol->value.boolValue ? "paz" : "guerra"); break;
+  case TYPE_RECURSO_ARRAY:
+  case TYPE_EPOCA_ARRAY:
+  case TYPE_MORAL_ARRAY:
+  case TYPE_HEROE_ARRAY:
+  case TYPE_ALIADO_ARRAY: snprintf(buffer, size, "%s", symbol->value.strValue); break;
   case TYPE_NADA:
   case TYPE_UNKNOWN: snprintf(buffer, size, "?"); break;
   }
@@ -115,22 +120,22 @@ static const char *kind_name(SymbolKind kind) {
 }
 
 void symbol_table_print(const SymbolTable *table) {
-  const char *line = "+-----+------------------+------------+----------+------------------+------------+------------------+\n";
+  const char *line = "+-----+------------------+------------+-----------+------------------+------------+------------------+\n";
   int number = 0;
   char value[64];
   printf("%s", line);
-  printf("| %-3s | %-16s | %-10s | %-8s | %-16s | %-10s | %-16s |\n", "#", "Nombre", "Clase",
+  printf("| %-3s | %-16s | %-10s | %-9s | %-16s | %-10s | %-16s |\n", "#", "Nombre", "Clase",
          "Tipo", "Ambito", "Linea", "Valor");
   printf("%s", line);
   for (const Symbol *symbol = table->head; symbol != NULL; symbol = symbol->next) {
     value_text(symbol, value, sizeof(value));
-    printf("| %-3d | %-16s | %-10s | %-8s | %-16s | linea %-4d | %-16s |\n", ++number,
+    printf("| %-3d | %-16s | %-10s | %-9s | %-16s | linea %-4d | %-16s |\n", ++number,
            symbol->name, kind_name(symbol->kind),
            symbol->type == TYPE_UNKNOWN ? "-" : data_type_name(symbol->type),
            symbol->scopeName, symbol->line, value);
   }
   if (number == 0) {
-    printf("| %-97s |\n", "(no se recluto ninguna unidad)");
+    printf("| %-98s |\n", "(no se recluto ninguna unidad)");
   }
   printf("%s", line);
 }
@@ -140,6 +145,7 @@ void symbol_table_destroy(SymbolTable *table) {
   while (symbol != NULL) {
     Symbol *next = symbol->next;
     if (symbol->hasValue && (symbol->type == TYPE_HEROE ||
+                             array_element_type(symbol->type) != TYPE_UNKNOWN ||
                              (symbol->kind == SYMBOL_SETTING && symbol->type == TYPE_UNKNOWN))) {
       free(symbol->value.strValue);
     }

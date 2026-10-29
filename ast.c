@@ -146,6 +146,55 @@ ASTNode *create_if_node(ASTNode *condition, ASTNode *then_body, ASTNode *else_bo
   return node;
 }
 
+ASTNode *create_array_node(ASTNode *elements, int line) {
+  ASTNode *node = allocate_new_node(ARRAY_LITERAL, line);
+  node->data.arrayLiteral.elementType = TYPE_UNKNOWN;
+  node->data.arrayLiteral.elements = elements;
+  return node;
+}
+
+ASTNode *create_array_index(const char *name, ASTNode *index, int line) {
+  ASTNode *node = allocate_new_node(ARRAY_INDEX, line);
+  node->data.arrayIndex.identifier = string_copy(name);
+  node->data.arrayIndex.index = index;
+  return node;
+}
+
+ASTNode *create_array_method_call(const char *name, const char *method, ASTNode *arguments,
+                                  int line) {
+  ASTNode *node = allocate_new_node(ARRAY_METHOD_CALL, line);
+  node->data.arrayMethodCall.identifier = string_copy(name);
+  node->data.arrayMethodCall.methodName = string_copy(method);
+  node->data.arrayMethodCall.arguments = arguments;
+  if (strcmp(method, "agregar") == 0) node->data.arrayMethodCall.method = ARRAY_PUSH;
+  else if (strcmp(method, "quitar") == 0) node->data.arrayMethodCall.method = ARRAY_POP;
+  else if (strcmp(method, "largo") == 0) node->data.arrayMethodCall.method = ARRAY_LENGTH;
+  else node->data.arrayMethodCall.method = ARRAY_UNKNOWN_METHOD;
+  return node;
+}
+
+DataType array_type_of(DataType element_type) {
+  switch (element_type) {
+  case TYPE_RECURSO: return TYPE_RECURSO_ARRAY;
+  case TYPE_EPOCA: return TYPE_EPOCA_ARRAY;
+  case TYPE_MORAL: return TYPE_MORAL_ARRAY;
+  case TYPE_HEROE: return TYPE_HEROE_ARRAY;
+  case TYPE_ALIADO: return TYPE_ALIADO_ARRAY;
+  default: return TYPE_UNKNOWN;
+  }
+}
+
+DataType array_element_type(DataType array_type) {
+  switch (array_type) {
+  case TYPE_RECURSO_ARRAY: return TYPE_RECURSO;
+  case TYPE_EPOCA_ARRAY: return TYPE_EPOCA;
+  case TYPE_MORAL_ARRAY: return TYPE_MORAL;
+  case TYPE_HEROE_ARRAY: return TYPE_HEROE;
+  case TYPE_ALIADO_ARRAY: return TYPE_ALIADO;
+  default: return TYPE_UNKNOWN;
+  }
+}
+
 const char *data_type_name(DataType type) {
   switch (type) {
   case TYPE_RECURSO: return "recurso";
@@ -153,6 +202,11 @@ const char *data_type_name(DataType type) {
   case TYPE_MORAL: return "moral";
   case TYPE_HEROE: return "heroe";
   case TYPE_ALIADO: return "aliado";
+  case TYPE_RECURSO_ARRAY: return "recurso[]";
+  case TYPE_EPOCA_ARRAY: return "epoca[]";
+  case TYPE_MORAL_ARRAY: return "moral[]";
+  case TYPE_HEROE_ARRAY: return "heroe[]";
+  case TYPE_ALIADO_ARRAY: return "aliado[]";
   case TYPE_NADA: return "nada";
   case TYPE_UNKNOWN: return "?";
   }
@@ -165,6 +219,7 @@ const char *value_kind_name(ValueKind kind) {
   case VALUE_FLOAT: return "decimal";
   case VALUE_TEXT: return "texto";
   case VALUE_BOOL: return "paz/guerra";
+  case VALUE_ARRAY: return "lista";
   case VALUE_NONE: return "-";
   }
   return "-";
@@ -208,6 +263,9 @@ static void expression_text(const ASTNode *expr, char *buffer, size_t size) {
   case BOOL_LITERAL: snprintf(buffer, size, "%s", expr->data.boolValue ? "paz" : "guerra"); break;
   case IDENTIFIER_REF: snprintf(buffer, size, "%s", expr->data.identifier); break;
   case BINARY_OP: snprintf(buffer, size, "%s", binary_operator_name(expr->data.binary.op)); break;
+  case ARRAY_METHOD_CALL:
+    snprintf(buffer, size, ".%s()", expr->data.arrayMethodCall.methodName);
+    break;
   default: snprintf(buffer, size, "-"); break;
   }
 }
@@ -224,6 +282,9 @@ static void expression_rows(const ASTNode *expr, int depth) {
   case IDENTIFIER_REF: node = "Uso de variable"; name = expr->data.identifier; break;
   case BINARY_OP: node = expr->data.binary.op >= OP_EQ ? "Comparacion" : "Operacion"; break;
   case FUNCTION_CALL: node = "Llamada a estrategia"; name = expr->data.functionCall.identifier; break;
+  case ARRAY_LITERAL: node = "Lista [ ]"; break;
+  case ARRAY_INDEX: node = "Posicion de lista"; name = expr->data.arrayIndex.identifier; break;
+  case ARRAY_METHOD_CALL: node = "Orden de lista"; name = expr->data.arrayMethodCall.identifier; break;
   default: break;
   }
   expression_text(expr, value, sizeof(value));
@@ -233,6 +294,16 @@ static void expression_rows(const ASTNode *expr, int depth) {
     expression_rows(expr->data.binary.right, depth + 1);
   } else if (expr->type == FUNCTION_CALL) {
     for (const ASTNode *arg = expr->data.functionCall.arguments; arg != NULL; arg = arg->next) {
+      expression_rows(arg, depth + 1);
+    }
+  } else if (expr->type == ARRAY_LITERAL) {
+    for (const ASTNode *item = expr->data.arrayLiteral.elements; item != NULL; item = item->next) {
+      expression_rows(item, depth + 1);
+    }
+  } else if (expr->type == ARRAY_INDEX) {
+    expression_rows(expr->data.arrayIndex.index, depth + 1);
+  } else if (expr->type == ARRAY_METHOD_CALL) {
+    for (const ASTNode *arg = expr->data.arrayMethodCall.arguments; arg != NULL; arg = arg->next) {
       expression_rows(arg, depth + 1);
     }
   }
@@ -265,7 +336,7 @@ static void statement_rows(const ASTNode *node, int depth) {
       if (node->data.returnStatement.value) {
         expression_rows(node->data.returnStatement.value, depth + 1);
       }
-    } else if (node->type == FUNCTION_CALL) {
+    } else if (node->type == FUNCTION_CALL || node->type == ARRAY_METHOD_CALL) {
       expression_rows(node, depth);
     } else if (node->type == WORLD_DECL || node->type == EMPIRE_DECL) {
       table_row(node->line, depth, node->type == WORLD_DECL ? "Mundo" : "Imperio", "-",
@@ -374,6 +445,18 @@ void free_ast(ASTNode *node) {
       free_ast(node->data.ifStatement.condition);
       free_ast(node->data.ifStatement.thenBody);
       free_ast(node->data.ifStatement.elseBody);
+      break;
+    case ARRAY_LITERAL:
+      free_ast(node->data.arrayLiteral.elements);
+      break;
+    case ARRAY_INDEX:
+      free(node->data.arrayIndex.identifier);
+      free_ast(node->data.arrayIndex.index);
+      break;
+    case ARRAY_METHOD_CALL:
+      free(node->data.arrayMethodCall.identifier);
+      free(node->data.arrayMethodCall.methodName);
+      free_ast(node->data.arrayMethodCall.arguments);
       break;
     case INT_LITERAL:
     case FLOAT_LITERAL:

@@ -86,6 +86,9 @@ static void lexical_error(const char *message) {
 ")"                    { open_parens--; TOKEN(')'); }
 "{"                    { open_braces++; current_block = pending_block; TOKEN('{'); }
 "}"                    { open_braces--; TOKEN('}'); }
+"["                    { TOKEN('['); }
+"]"                    { TOKEN(']'); }
+"."                    { TOKEN('.'); }
 "+"                    { TOKEN('+'); }
 "-"                    { TOKEN('-'); }
 "*"                    { TOKEN('*'); }

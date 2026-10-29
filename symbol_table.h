@@ -14,11 +14,14 @@ typedef enum {
   SYMBOL_TREASURE
 } SymbolKind;
 
+struct RuntimeArray;
+
 typedef union {
   long intValue;
   double floatValue;
   char *strValue;
   int boolValue;
+  struct RuntimeArray *arrayValue;
 } SymbolValue;
 
 typedef struct Symbol {

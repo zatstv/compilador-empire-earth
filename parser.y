@@ -67,8 +67,9 @@ static void syntax_defeat(int line, const char *message, const char *name) {
 %type <node> world_declaration world_setting_list world_setting
 %type <node> empire_declaration empire_statement_list empire_statement
 %type <node> if_statement block optional_else_block
+%type <node> array_method_call
 %type <parameter> optional_parameters parameter_list parameter
-%type <data_type> return_type
+%type <data_type> return_type value_type
 
 %%
 
@@ -102,6 +103,9 @@ statement:
         $$ = $1;
     }
     | function_call ';' {
+        $$ = $1;
+    }
+    | array_method_call ';' {
         $$ = $1;
     }
     | world_declaration {
@@ -200,8 +204,13 @@ function_declaration:
     ;
 
 return_type:
-    TOKEN_TYPE { $$ = $1.value; }
+    value_type { $$ = $1; }
     | TOKEN_NOTHING { $$ = TYPE_NADA; }
+    ;
+
+value_type:
+    TOKEN_TYPE { $$ = $1.value; }
+    | TOKEN_TYPE '[' ']' { $$ = array_type_of($1.value); }
     ;
 
 optional_parameters:
@@ -218,8 +227,8 @@ parameter_list:
     ;
 
 parameter:
-    TOKEN_TYPE TOKEN_IDENTIFIER {
-        $$ = create_function_parameter($1.value, $2.text, $2.line);
+    value_type TOKEN_IDENTIFIER {
+        $$ = create_function_parameter($1, $2.text, $2.line);
         free($2.text);
     }
     ;
@@ -236,6 +245,7 @@ function_statement:
     | assignment ';' { $$ = $1; }
     | return_statement { $$ = $1; }
     | function_call ';' { $$ = $1; }
+    | array_method_call ';' { $$ = $1; }
     | if_statement { $$ = $1; }
     | error ';' {
         yyerrok;
@@ -276,6 +286,14 @@ function_call:
     }
     ;
 
+array_method_call:
+    TOKEN_IDENTIFIER '.' TOKEN_IDENTIFIER '(' optional_arguments ')' {
+        $$ = create_array_method_call($1.text, $3.text, $5, $1.line);
+        free($1.text);
+        free($3.text);
+    }
+    ;
+
 optional_arguments:
     { $$ = NULL; }
     | argument_list { $$ = $1; }
@@ -290,14 +308,14 @@ argument_list:
     ;
 
 var_declaration:
-    TOKEN_RECRUIT TOKEN_TYPE identifier_list {
+    TOKEN_RECRUIT value_type identifier_list {
         for (ASTNode *decl = $3; decl != NULL; decl = decl->next) {
-            decl->data.varDeclaration.dataType = $2.value;
+            decl->data.varDeclaration.dataType = $2;
         }
         $$ = $3;
     }
-    | TOKEN_RECRUIT TOKEN_TYPE TOKEN_IDENTIFIER TOKEN_ARROW expression {
-        $$ = create_var_decl($2.value, $3.text, $5, $3.line);
+    | TOKEN_RECRUIT value_type TOKEN_IDENTIFIER TOKEN_ARROW expression {
+        $$ = create_var_decl($2, $3.text, $5, $3.line);
         free($3.text);
     }
     | TOKEN_RECRUIT identifier_list {
@@ -355,6 +373,14 @@ expression:
         free($1.text);
     }
     | function_call { $$ = $1; }
+    | array_method_call { $$ = $1; }
+    | '[' optional_arguments ']' {
+        $$ = create_array_node($2, $2 ? $2->line : yylineno);
+    }
+    | TOKEN_IDENTIFIER '[' expression ']' {
+        $$ = create_array_index($1.text, $3, $1.line);
+        free($1.text);
+    }
     | '(' expression ')' { $$ = $2; }
     | expression '+' expression { $$ = create_binary_node(OP_ADD, $1, $3, $1->line); }
     | expression '-' expression { $$ = create_binary_node(OP_SUB, $1, $3, $1->line); }

@@ -29,6 +29,11 @@ static ValueKind kind_of_type(DataType type) {
   case TYPE_MORAL: return VALUE_INT;
   case TYPE_HEROE: return VALUE_TEXT;
   case TYPE_ALIADO: return VALUE_BOOL;
+  case TYPE_RECURSO_ARRAY:
+  case TYPE_EPOCA_ARRAY:
+  case TYPE_MORAL_ARRAY:
+  case TYPE_HEROE_ARRAY:
+  case TYPE_ALIADO_ARRAY: return VALUE_ARRAY;
   case TYPE_NADA:
   case TYPE_UNKNOWN: return VALUE_NONE;
   }
@@ -41,6 +46,7 @@ static const char *kind_description(ValueKind kind) {
   case VALUE_FLOAT: return "decimales";
   case VALUE_TEXT: return "texto";
   case VALUE_BOOL: return "paz ni guerra";
+  case VALUE_ARRAY: return "listas";
   case VALUE_NONE: return "ese valor";
   }
   return "ese valor";
@@ -53,6 +59,11 @@ static int accepts(DataType target, ValueKind kind) {
   case TYPE_MORAL: return kind == VALUE_INT;
   case TYPE_HEROE: return kind == VALUE_TEXT;
   case TYPE_ALIADO: return kind == VALUE_BOOL;
+  case TYPE_RECURSO_ARRAY:
+  case TYPE_EPOCA_ARRAY:
+  case TYPE_MORAL_ARRAY:
+  case TYPE_HEROE_ARRAY:
+  case TYPE_ALIADO_ARRAY: return kind == VALUE_ARRAY;
   case TYPE_NADA:
   case TYPE_UNKNOWN: return 0;
   }
@@ -73,7 +84,48 @@ static void check_range(DataType target, const ASTNode *value) {
   }
 }
 
+static DataType list_type(const ASTNode *expr, SymbolTable *table) {
+  const char *name = expr->type == FUNCTION_CALL ? expr->data.functionCall.identifier
+                                                 : expr->data.identifier;
+  const Symbol *symbol = symbol_table_lookup(table, name);
+  return symbol == NULL ? TYPE_UNKNOWN : symbol->type;
+}
+
+static void check_value(DataType target, ASTNode *value, SymbolTable *table);
+
+static void check_list_value(DataType target, ASTNode *value, SymbolTable *table) {
+  DataType element = array_element_type(target);
+  if (value->type == ARRAY_LITERAL) {
+    value->data.arrayLiteral.elementType = element;
+    value->valueKind = VALUE_ARRAY;
+    for (ASTNode *item = value->data.arrayLiteral.elements; item != NULL; item = item->next) {
+      check_value(element, item, table);
+    }
+    return;
+  }
+
+  ValueKind kind = check_expression(value, table);
+  if (kind == VALUE_NONE) {
+    return;
+  }
+  if (kind != VALUE_ARRAY) {
+    defeat(value->line, "una lista %s no acepta %s", data_type_name(target),
+           kind_description(kind));
+    return;
+  }
+  DataType source = list_type(value, table);
+  if (source != target) {
+    defeat(value->line, "una lista %s no acepta una lista %s", data_type_name(target),
+           data_type_name(source));
+  }
+}
+
 static void check_value(DataType target, ASTNode *value, SymbolTable *table) {
+  if (array_element_type(target) != TYPE_UNKNOWN) {
+    check_list_value(target, value, table);
+    return;
+  }
+
   ValueKind kind = check_expression(value, table);
   if (kind == VALUE_NONE) {
     return;
@@ -115,6 +167,11 @@ static DataType check_call(ASTNode *call, SymbolTable *table) {
 
   param = function->parameters;
   for (arg = call->data.functionCall.arguments; arg != NULL; arg = arg->next) {
+    if (array_element_type(param->dataType) != TYPE_UNKNOWN) {
+      check_value(param->dataType, arg, table);
+      param = param->next;
+      continue;
+    }
     ValueKind kind = check_expression(arg, table);
     if (kind != VALUE_NONE && !accepts(param->dataType, kind)) {
       defeat(arg->line, "el parametro '%s' de '%s' es %s y no acepta %s", param->identifier,
@@ -125,6 +182,53 @@ static DataType check_call(ASTNode *call, SymbolTable *table) {
     param = param->next;
   }
   return function->returnType;
+}
+
+static const Symbol *find_list(int line, const char *name, SymbolTable *table) {
+  const Symbol *symbol = symbol_table_lookup(table, name);
+  if (symbol == NULL) {
+    defeat(line, "la unidad '%s' nunca fue reclutada", name);
+    return NULL;
+  }
+  if (array_element_type(symbol->type) == TYPE_UNKNOWN ||
+      (symbol->kind != SYMBOL_UNIT && symbol->kind != SYMBOL_PARAMETER)) {
+    defeat(line, "'%s' no es una lista", name);
+    return NULL;
+  }
+  return symbol;
+}
+
+static ValueKind check_list_call(ASTNode *call, SymbolTable *table) {
+  const char *method = call->data.arrayMethodCall.methodName;
+  ASTNode *arguments = call->data.arrayMethodCall.arguments;
+  int count = 0;
+  for (const ASTNode *arg = arguments; arg != NULL; arg = arg->next) count++;
+
+  const Symbol *list = find_list(call->line, call->data.arrayMethodCall.identifier, table);
+  if (list == NULL) {
+    return VALUE_NONE;
+  }
+  DataType element = array_element_type(list->type);
+  switch (call->data.arrayMethodCall.method) {
+  case ARRAY_PUSH:
+    if (count != 1) {
+      defeat(call->line, "agregar recibe 1 valor y se le dieron %d", count);
+      return VALUE_NONE;
+    }
+    check_value(element, arguments, table);
+    return VALUE_NONE;
+  case ARRAY_POP:
+  case ARRAY_LENGTH:
+    if (count != 0) {
+      defeat(call->line, "%s no recibe valores (se le dieron %d)", method, count);
+      return VALUE_NONE;
+    }
+    return call->data.arrayMethodCall.method == ARRAY_POP ? kind_of_type(element) : VALUE_INT;
+  case ARRAY_UNKNOWN_METHOD:
+    defeat(call->line, "las listas solo tienen agregar, quitar y largo (se puso '%s')", method);
+    return VALUE_NONE;
+  }
+  return VALUE_NONE;
 }
 
 static ValueKind check_expression(ASTNode *expr, SymbolTable *table) {
@@ -162,6 +266,10 @@ static ValueKind check_expression(ASTNode *expr, SymbolTable *table) {
       return VALUE_NONE;
     }
     if (expr->data.binary.op >= OP_EQ) {
+      if (left == VALUE_ARRAY || right == VALUE_ARRAY) {
+        defeat(expr->line, "no se pueden comparar listas, compara sus elementos con [ ]");
+        return VALUE_NONE;
+      }
       if (left != right) {
         defeat(expr->line, "no se puede comparar %s con %s", value_kind_name(left),
                value_kind_name(right));
@@ -183,6 +291,30 @@ static ValueKind check_expression(ASTNode *expr, SymbolTable *table) {
     expr->valueKind = VALUE_INT;
     break;
   }
+  case ARRAY_LITERAL:
+    defeat(expr->line, "una lista [ ] solo se puede guardar en una unidad de lista (como recurso[])");
+    return VALUE_NONE;
+  case ARRAY_INDEX: {
+    ASTNode *index = expr->data.arrayIndex.index;
+    ValueKind kind = check_expression(index, table);
+    if (kind != VALUE_NONE && kind != VALUE_INT) {
+      defeat(index->line, "la posicion de una lista tiene que ser un numero entero (se puso %s)",
+             value_kind_name(kind));
+    }
+    const Symbol *list = find_list(expr->line, expr->data.arrayIndex.identifier, table);
+    if (list == NULL) {
+      return VALUE_NONE;
+    }
+    expr->valueKind = kind_of_type(array_element_type(list->type));
+    break;
+  }
+  case ARRAY_METHOD_CALL:
+    if (expr->data.arrayMethodCall.method == ARRAY_PUSH) {
+      defeat(expr->line, "agregar no entrega ningun valor, se usa solo en su linea");
+      return VALUE_NONE;
+    }
+    expr->valueKind = check_list_call(expr, table);
+    break;
   default:
     break;
   }
@@ -349,6 +481,8 @@ static void check_statement(ASTNode *node, SymbolTable *table) {
     check_function(node, table);
   } else if (node->type == FUNCTION_CALL) {
     check_call(node, table);
+  } else if (node->type == ARRAY_METHOD_CALL) {
+    check_list_call(node, table);
   } else if (node->type == WORLD_DECL || node->type == EMPIRE_DECL) {
     check_block(node, table);
   } else if (node->type == IF_STMT) {

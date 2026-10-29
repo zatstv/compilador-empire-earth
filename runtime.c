@@ -1,6 +1,7 @@
 #include "runtime.h"
 #include "string_utils.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,9 +18,62 @@ typedef struct RuntimeVariable {
   struct RuntimeVariable *next;
 } RuntimeVariable;
 
+typedef struct RuntimeArray {
+  DataType elementType;
+  SymbolValue *items;
+  size_t length;
+  size_t capacity;
+  struct RuntimeArray *next_allocated;
+} RuntimeArray;
+
 static const ASTNode *program_root;
 static SymbolTable *symbols;
 static RuntimeVariable *global_variables;
+static RuntimeArray *allocated_arrays;
+
+static RuntimeArray *array_create(DataType element_type) {
+  RuntimeArray *array = calloc(1, sizeof(*array));
+  if (array == NULL) {
+    fprintf(stderr, "Out of memory while creating array\n");
+    return NULL;
+  }
+  array->elementType = element_type;
+  array->next_allocated = allocated_arrays;
+  allocated_arrays = array;
+  return array;
+}
+
+static int grow_array(RuntimeArray *array) {
+  if (array->capacity > SIZE_MAX / 2 / sizeof(*array->items)) {
+    fprintf(stderr, "Array has reached its maximum capacity\n");
+    return 0;
+  }
+  size_t new_capacity = array->capacity == 0 ? 4 : array->capacity * 2;
+  SymbolValue *new_items = realloc(array->items, new_capacity * sizeof(*new_items));
+  if (new_items == NULL) {
+    fprintf(stderr, "Out of memory while growing array\n");
+    return 0;
+  }
+  array->items = new_items;
+  array->capacity = new_capacity;
+  return 1;
+}
+
+static int array_push(RuntimeArray *array, SymbolValue value) {
+  if (array->length == array->capacity && !grow_array(array)) return 0;
+  array->items[array->length] = value;
+  array->length++;
+  return 1;
+}
+
+static void release_arrays(void) {
+  while (allocated_arrays != NULL) {
+    RuntimeArray *array = allocated_arrays;
+    allocated_arrays = array->next_allocated;
+    free(array->items);
+    free(array);
+  }
+}
 
 static RuntimeVariable *find_variable(RuntimeVariable *variables, const char *name) {
   for (; variables != NULL; variables = variables->next) {
@@ -67,6 +121,11 @@ static SymbolValue default_value(DataType type) {
   switch (type) {
   case TYPE_EPOCA: value.intValue = 1; break;
   case TYPE_HEROE: value.strValue = ""; break;
+  case TYPE_RECURSO_ARRAY:
+  case TYPE_EPOCA_ARRAY:
+  case TYPE_MORAL_ARRAY:
+  case TYPE_HEROE_ARRAY:
+  case TYPE_ALIADO_ARRAY: value.arrayValue = array_create(array_element_type(type)); break;
   default: break;
   }
   return value;
@@ -187,6 +246,63 @@ static int compare(BinaryOperator op, const RuntimeValue *left, const RuntimeVal
   }
 }
 
+static int evaluate_list(const ASTNode *expr, RuntimeVariable *variables, RuntimeValue *result) {
+  DataType element = expr->data.arrayLiteral.elementType;
+  RuntimeArray *array = array_create(element);
+  if (array == NULL) return 0;
+  for (const ASTNode *item = expr->data.arrayLiteral.elements; item != NULL; item = item->next) {
+    RuntimeValue value;
+    if (!evaluate(item, variables, &value) ||
+        !fits(element, &value, item->line, "un elemento de la lista") ||
+        !array_push(array, value.data)) {
+      return 0;
+    }
+  }
+  result->data.arrayValue = array;
+  return 1;
+}
+
+static int evaluate_index(const ASTNode *expr, RuntimeVariable *variables, RuntimeValue *result) {
+  const char *name = expr->data.arrayIndex.identifier;
+  RuntimeArray *array = find_variable(variables, name)->value.arrayValue;
+  RuntimeValue index;
+  if (!evaluate(expr->data.arrayIndex.index, variables, &index)) return 0;
+  if (index.data.intValue < 0 || (size_t)index.data.intValue >= array->length) {
+    fprintf(stderr, "DERROTA en la linea %d: la lista '%s' no tiene la posicion %ld (tiene %zu elemento(s))\n",
+            expr->line, name, index.data.intValue, array->length);
+    return 0;
+  }
+  result->data = array->items[index.data.intValue];
+  return 1;
+}
+
+static int evaluate_list_call(const ASTNode *expr, RuntimeVariable *variables,
+                              RuntimeValue *result) {
+  const char *name = expr->data.arrayMethodCall.identifier;
+  RuntimeArray *array = find_variable(variables, name)->value.arrayValue;
+  RuntimeValue value;
+  switch (expr->data.arrayMethodCall.method) {
+  case ARRAY_PUSH:
+    return evaluate(expr->data.arrayMethodCall.arguments, variables, &value) &&
+           fits(array->elementType, &value, expr->line, name) && array_push(array, value.data);
+  case ARRAY_POP:
+    if (array->length == 0) {
+      fprintf(stderr, "DERROTA en la linea %d: la lista '%s' esta vacia, no hay nada que quitar\n",
+              expr->line, name);
+      return 0;
+    }
+    array->length--;
+    result->data = array->items[array->length];
+    return 1;
+  case ARRAY_LENGTH:
+    result->data.intValue = (long)array->length;
+    return 1;
+  case ARRAY_UNKNOWN_METHOD:
+    return 0;
+  }
+  return 0;
+}
+
 static int evaluate(const ASTNode *expr, RuntimeVariable *variables, RuntimeValue *result) {
   result->kind = expr->valueKind;
   switch (expr->type) {
@@ -198,6 +314,12 @@ static int evaluate(const ASTNode *expr, RuntimeVariable *variables, RuntimeValu
     return 1;
   case FUNCTION_CALL:
     return call_function(expr, variables, result);
+  case ARRAY_LITERAL:
+    return evaluate_list(expr, variables, result);
+  case ARRAY_INDEX:
+    return evaluate_index(expr, variables, result);
+  case ARRAY_METHOD_CALL:
+    return evaluate_list_call(expr, variables, result);
   case BINARY_OP: {
     RuntimeValue left;
     RuntimeValue right;
@@ -258,10 +380,13 @@ static int execute_statement(const ASTNode *node, RuntimeVariable **variables) {
   switch (node->type) {
   case VAR_DECL: {
     const VarDeclaration *decl = &node->data.varDeclaration;
-    value.data = default_value(decl->dataType);
-    if (decl->init != NULL &&
-        (!evaluate(decl->init, *variables, &value) ||
-         !fits(decl->dataType, &value, decl->init->line, decl->identifier))) {
+    if (decl->init == NULL) {
+      value.data = default_value(decl->dataType);
+      if (array_element_type(decl->dataType) != TYPE_UNKNOWN && value.data.arrayValue == NULL) {
+        return 0;
+      }
+    } else if (!evaluate(decl->init, *variables, &value) ||
+               !fits(decl->dataType, &value, decl->init->line, decl->identifier)) {
       return 0;
     }
     return push_variable(variables, decl->identifier, decl->dataType, value.data);
@@ -277,6 +402,8 @@ static int execute_statement(const ASTNode *node, RuntimeVariable **variables) {
   }
   case FUNCTION_CALL:
     return call_function(node, *variables, &value);
+  case ARRAY_METHOD_CALL:
+    return evaluate(node, *variables, &value);
   case WORLD_DECL:
   case EMPIRE_DECL:
     return execute_block(node, *variables);
@@ -289,6 +416,31 @@ static int execute_statement(const ASTNode *node, RuntimeVariable **variables) {
   }
 }
 
+static void list_text(const RuntimeArray *array, char *buffer, size_t size) {
+  size_t used = snprintf(buffer, size, "[");
+  for (size_t i = 0; i < array->length && used < size; i++) {
+    const SymbolValue *item = &array->items[i];
+    const char *comma = i > 0 ? ", " : "";
+    switch (array->elementType) {
+    case TYPE_HEROE:
+      used += snprintf(buffer + used, size - used, "%s\"%s\"", comma, item->strValue);
+      break;
+    case TYPE_ALIADO:
+      used += snprintf(buffer + used, size - used, "%s%s", comma, item->boolValue ? "paz" : "guerra");
+      break;
+    default:
+      used += snprintf(buffer + used, size - used, "%s%ld", comma, item->intValue);
+      break;
+    }
+  }
+  if (used + 2 > size) {
+    snprintf(buffer, size, "(%zu elementos)", array->length);
+  } else {
+    buffer[used] = ']';
+    buffer[used + 1] = '\0';
+  }
+}
+
 static void save_globals(SymbolTable *table) {
   for (RuntimeVariable *variable = global_variables; variable != NULL; variable = variable->next) {
     Symbol *symbol = symbol_table_lookup(table, variable->name);
@@ -296,6 +448,10 @@ static void save_globals(SymbolTable *table) {
     symbol->value = variable->value;
     if (symbol->type == TYPE_HEROE) {
       symbol->value.strValue = string_copy(variable->value.strValue);
+    } else if (array_element_type(symbol->type) != TYPE_UNKNOWN) {
+      char text[64];
+      list_text(variable->value.arrayValue, text, sizeof(text));
+      symbol->value.strValue = string_copy(text);
     }
     symbol->hasValue = 1;
   }
@@ -314,5 +470,6 @@ int execute_program(const ASTNode *program, SymbolTable *table) {
   }
   save_globals(table);
   release_variables_until(&global_variables, NULL);
+  release_arrays();
   return succeeded;
 }

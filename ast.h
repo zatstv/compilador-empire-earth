@@ -7,6 +7,11 @@ typedef enum {
   TYPE_MORAL,
   TYPE_HEROE,
   TYPE_ALIADO,
+  TYPE_RECURSO_ARRAY,
+  TYPE_EPOCA_ARRAY,
+  TYPE_MORAL_ARRAY,
+  TYPE_HEROE_ARRAY,
+  TYPE_ALIADO_ARRAY,
   TYPE_NADA,
   TYPE_UNKNOWN
 } DataType;
@@ -16,6 +21,7 @@ typedef enum {
   VALUE_FLOAT,
   VALUE_TEXT,
   VALUE_BOOL,
+  VALUE_ARRAY,
   VALUE_NONE
 } ValueKind;
 
@@ -53,7 +59,17 @@ typedef enum {
   IDENTIFIER_REF,
   FUNCTION_CALL,
   BINARY_OP,
+  ARRAY_LITERAL,
+  ARRAY_INDEX,
+  ARRAY_METHOD_CALL,
 } NodeType;
+
+typedef enum {
+  ARRAY_PUSH,
+  ARRAY_POP,
+  ARRAY_LENGTH,
+  ARRAY_UNKNOWN_METHOD
+} ArrayMethod;
 
 typedef struct VarDeclaration {
   DataType dataType;
@@ -118,6 +134,20 @@ typedef struct ASTNode {
       struct ASTNode *value;
     } returnStatement;
     struct {
+      DataType elementType;
+      struct ASTNode *elements;
+    } arrayLiteral;
+    struct {
+      char *identifier;
+      struct ASTNode *index;
+    } arrayIndex;
+    struct {
+      char *identifier;
+      char *methodName;
+      ArrayMethod method;
+      struct ASTNode *arguments;
+    } arrayMethodCall;
+    struct {
       struct ASTNode *condition;
       struct ASTNode *thenBody;
       struct ASTNode *elseBody;
@@ -145,6 +175,13 @@ ASTNode *create_block_decl(NodeType type, const char *name, ASTNode *body, int l
 ASTNode *create_world_item(NodeType type, const char *word, ASTNode *amount, int line);
 ASTNode *create_binary_node(BinaryOperator op, ASTNode *left, ASTNode *right, int line);
 ASTNode *create_if_node(ASTNode *condition, ASTNode *then_body, ASTNode *else_body, int line);
+ASTNode *create_array_node(ASTNode *elements, int line);
+ASTNode *create_array_index(const char *name, ASTNode *index, int line);
+ASTNode *create_array_method_call(const char *name, const char *method, ASTNode *arguments,
+                                  int line);
+
+DataType array_type_of(DataType element_type);
+DataType array_element_type(DataType array_type);
 
 const char *data_type_name(DataType type);
 const char *value_kind_name(ValueKind kind);
