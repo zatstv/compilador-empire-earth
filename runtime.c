@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_WHILE_TURNS 100000
+
 typedef struct {
   ValueKind kind;
   SymbolValue data;
@@ -155,6 +157,9 @@ static int evaluate(const ASTNode *expr, RuntimeVariable *variables, RuntimeValu
 static int execute_statement(const ASTNode *node, RuntimeVariable **variables);
 static int execute_if(const ASTNode *node, RuntimeVariable **variables, const ASTNode *call,
                       const FunctionDeclaration *function, RuntimeValue *result, int *returned);
+static int execute_while(const ASTNode *node, RuntimeVariable **variables, const ASTNode *call,
+                         const FunctionDeclaration *function, RuntimeValue *result,
+                         int *returned);
 
 static int bind_parameters(const FunctionDeclaration *function, const ASTNode *arguments,
                            RuntimeVariable *caller_variables, RuntimeVariable **variables) {
@@ -188,6 +193,11 @@ static int execute_list(const ASTNode *node, RuntimeVariable **variables, const 
       if (*returned) return 1;
       continue;
     }
+    if (node->type == WHILE_STMT) {
+      if (!execute_while(node, variables, call, function, result, returned)) return 0;
+      if (*returned) return 1;
+      continue;
+    }
     if (!execute_statement(node, variables)) return 0;
   }
   return 1;
@@ -203,6 +213,28 @@ static int execute_if(const ASTNode *node, RuntimeVariable **variables, const AS
   int succeeded = execute_list(body, variables, call, function, result, returned);
   release_variables_until(variables, block_start);
   return succeeded;
+}
+
+static int execute_while(const ASTNode *node, RuntimeVariable **variables, const ASTNode *call,
+                         const FunctionDeclaration *function, RuntimeValue *result,
+                         int *returned) {
+  long turns = 0;
+  while (1) {
+    RuntimeValue condition;
+    if (!evaluate(node->data.whileStatement.condition, *variables, &condition)) return 0;
+    if (!condition.data.boolValue) return 1;
+    if (++turns > MAX_WHILE_TURNS) {
+      fprintf(stderr, "DERROTA en la linea %d: el mientras dio mas de %d vueltas y nunca termina\n",
+              node->line, MAX_WHILE_TURNS);
+      return 0;
+    }
+    RuntimeVariable *block_start = *variables;
+    int succeeded = execute_list(node->data.whileStatement.body, variables, call, function, result,
+                                 returned);
+    release_variables_until(variables, block_start);
+    if (!succeeded) return 0;
+    if (*returned) return 1;
+  }
 }
 
 static int execute_body(const ASTNode *call, const FunctionDeclaration *function,
@@ -410,6 +442,10 @@ static int execute_statement(const ASTNode *node, RuntimeVariable **variables) {
   case IF_STMT: {
     int returned = 0;
     return execute_if(node, variables, NULL, NULL, &value, &returned);
+  }
+  case WHILE_STMT: {
+    int returned = 0;
+    return execute_while(node, variables, NULL, NULL, &value, &returned);
   }
   default:
     return 1;

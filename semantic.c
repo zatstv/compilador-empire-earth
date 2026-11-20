@@ -355,6 +355,16 @@ static void check_if(ASTNode *node, SymbolTable *table) {
   check_if_body(node->data.ifStatement.elseBody, "sino", table);
 }
 
+static void check_while(ASTNode *node, SymbolTable *table) {
+  ASTNode *condition = node->data.whileStatement.condition;
+  ValueKind kind = check_expression(condition, table);
+  if (kind != VALUE_NONE && kind != VALUE_BOOL) {
+    defeat(condition->line, "la condicion del mientras tiene que dar paz o guerra (dio %s)",
+           value_kind_name(kind));
+  }
+  check_if_body(node->data.whileStatement.body, "mientras", table);
+}
+
 static void check_function(ASTNode *node, SymbolTable *table) {
   const FunctionDeclaration *function = &node->data.functionDeclaration;
   const Symbol *existing = symbol_table_lookup_current(table, function->identifier);
@@ -487,6 +497,8 @@ static void check_statement(ASTNode *node, SymbolTable *table) {
     check_block(node, table);
   } else if (node->type == IF_STMT) {
     check_if(node, table);
+  } else if (node->type == WHILE_STMT) {
+    check_while(node, table);
   } else if (node->type == RETURN_STMT) {
     ASTNode *value = node->data.returnStatement.value;
     if (current_function == NULL) {

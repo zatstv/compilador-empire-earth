@@ -43,7 +43,7 @@ static void syntax_defeat(int line, const char *message, const char *name) {
 %token <line> TOKEN_FUNCTION TOKEN_RETURN TOKEN_NOTHING
 %token <line> TOKEN_WORLD TOKEN_EMPIRE TOKEN_SIZE TOKEN_TERRAIN TOKEN_WATER
 %token <line> TOKEN_POPULATE TOKEN_TREASURE
-%token <line> TOKEN_IF TOKEN_ELSE
+%token <line> TOKEN_IF TOKEN_ELSE TOKEN_WHILE
 %token TOKEN_EQ TOKEN_NE TOKEN_LE TOKEN_GE
 %token <type> TOKEN_TYPE
 %token <str> TOKEN_IDENTIFIER
@@ -66,7 +66,7 @@ static void syntax_defeat(int line, const char *message, const char *name) {
 %type <node> function_call optional_arguments argument_list
 %type <node> world_declaration world_setting_list world_setting
 %type <node> empire_declaration empire_statement_list empire_statement
-%type <node> if_statement block optional_else_block
+%type <node> if_statement block optional_else_block while_statement
 %type <node> array_method_call
 %type <parameter> optional_parameters parameter_list parameter
 %type <data_type> return_type value_type
@@ -115,6 +115,9 @@ statement:
         $$ = $1;
     }
     | if_statement {
+        $$ = $1;
+    }
+    | while_statement {
         $$ = $1;
     }
     | error ';' {
@@ -247,6 +250,7 @@ function_statement:
     | function_call ';' { $$ = $1; }
     | array_method_call ';' { $$ = $1; }
     | if_statement { $$ = $1; }
+    | while_statement { $$ = $1; }
     | error ';' {
         yyerrok;
         $$ = NULL;
@@ -263,6 +267,16 @@ if_statement:
         $$ = create_if_node($3, $5, $6, $1);
     }
     | TOKEN_IF error '}' {
+        yyerrok;
+        $$ = NULL;
+    }
+    ;
+
+while_statement:
+    TOKEN_WHILE '(' expression ')' block {
+        $$ = create_while_node($3, $5, $1);
+    }
+    | TOKEN_WHILE error '}' {
         yyerrok;
         $$ = NULL;
     }
@@ -397,13 +411,15 @@ expression:
 %%
 
 static const char *block_name(int block, int form) {
-    static const char *names[4][3] = {
+    static const char *names[5][3] = {
         {"la estrategia", "una estrategia", "de la estrategia"},
         {"el mundo", "un mundo", "del mundo"},
         {"el imperio", "un imperio", "del imperio"},
         {"el si", "un si", "del si"},
+        {"el mientras", "un mientras", "del mientras"},
     };
-    int row = block == TOKEN_WORLD ? 1 : block == TOKEN_EMPIRE ? 2 : block == TOKEN_IF ? 3 : 0;
+    int row = block == TOKEN_WORLD ? 1 : block == TOKEN_EMPIRE ? 2 : block == TOKEN_IF ? 3 :
+              block == TOKEN_WHILE ? 4 : 0;
     return names[row][form];
 }
 
@@ -437,6 +453,9 @@ void yyerror(const char *s) {
     } else if (previous_token == TOKEN_IF && yychar != '(') {
         fprintf(stderr, "DERROTA en la linea %d: la condicion del si va entre parentesis ( )\n",
                 yylineno);
+    } else if (previous_token == TOKEN_WHILE && yychar != '(') {
+        fprintf(stderr, "DERROTA en la linea %d: la condicion del mientras va entre parentesis ( )\n",
+                yylineno);
     } else if ((yychar == TOKEN_TYPE || yychar == TOKEN_NOTHING) && previous_token == ')') {
         fprintf(stderr, "DERROTA en la linea %d: falta ':' antes del tipo de la estrategia\n",
                 yylineno);
@@ -454,7 +473,8 @@ void yyerror(const char *s) {
                strcmp(yytext, "tributo") == 0 || strcmp(yytext, "nada") == 0 ||
                yychar == TOKEN_WORLD || yychar == TOKEN_EMPIRE || yychar == TOKEN_SIZE ||
                yychar == TOKEN_TERRAIN || yychar == TOKEN_WATER || yychar == TOKEN_POPULATE ||
-               yychar == TOKEN_TREASURE || yychar == TOKEN_IF || yychar == TOKEN_ELSE) {
+               yychar == TOKEN_TREASURE || yychar == TOKEN_IF || yychar == TOKEN_ELSE ||
+               yychar == TOKEN_WHILE) {
         fprintf(stderr, "DERROTA en la linea %d: '%s' es palabra reservada y no se puede usar ahi\n",
                 yylineno, yytext);
     } else {

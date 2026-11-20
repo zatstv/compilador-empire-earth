@@ -146,6 +146,13 @@ ASTNode *create_if_node(ASTNode *condition, ASTNode *then_body, ASTNode *else_bo
   return node;
 }
 
+ASTNode *create_while_node(ASTNode *condition, ASTNode *body, int line) {
+  ASTNode *node = allocate_new_node(WHILE_STMT, line);
+  node->data.whileStatement.condition = condition;
+  node->data.whileStatement.body = body;
+  return node;
+}
+
 ASTNode *create_array_node(ASTNode *elements, int line) {
   ASTNode *node = allocate_new_node(ARRAY_LITERAL, line);
   node->data.arrayLiteral.elementType = TYPE_UNKNOWN;
@@ -352,6 +359,12 @@ static void statement_rows(const ASTNode *node, int depth) {
         table_row(node->data.ifStatement.elseBody->line, depth + 1, "Sino (else)", "-", "-", "");
         statement_rows(node->data.ifStatement.elseBody, depth + 2);
       }
+    } else if (node->type == WHILE_STMT) {
+      table_row(node->line, depth, "Mientras (while)", "-", "-", "");
+      expression_rows(node->data.whileStatement.condition, depth + 1);
+      table_row(node->line, depth + 1, "Repetir", "-", "-",
+                node->data.whileStatement.body ? "" : "(vacio)");
+      statement_rows(node->data.whileStatement.body, depth + 2);
     } else {
       const WorldItem *item = &node->data.worldItem;
       const char *name = "?";
@@ -445,6 +458,10 @@ void free_ast(ASTNode *node) {
       free_ast(node->data.ifStatement.condition);
       free_ast(node->data.ifStatement.thenBody);
       free_ast(node->data.ifStatement.elseBody);
+      break;
+    case WHILE_STMT:
+      free_ast(node->data.whileStatement.condition);
+      free_ast(node->data.whileStatement.body);
       break;
     case ARRAY_LITERAL:
       free_ast(node->data.arrayLiteral.elements);

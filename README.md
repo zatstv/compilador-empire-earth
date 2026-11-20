@@ -97,6 +97,24 @@ oro <- almacen.largo();
 - `largo()` dice cuántos tiene.
 - Una lista sin valor empieza vacía, y también se puede pasar a una estrategia.
 
+### Si y mientras
+
+```
+si (oro >= 200) {
+    animo <- 5;
+} sino {
+    animo <- 1;
+}
+
+mientras (era < 14) {
+    era <- era + 1;
+}
+```
+
+- La condición va entre paréntesis y tiene que dar `paz` o `guerra`.
+- `<`, `>`, `<=` y `>=` solo sirven con números.
+- Si un `mientras` da más de 100000 vueltas, el programa se detiene con una derrota.
+
 ### Tipos
 
 | Tipo | Qué guarda | Valor inicial |
@@ -152,7 +170,7 @@ Si algo está mal el compilador muestra `DERROTA en la linea N:` y qué fue lo q
 - [x] Estrategias (funciones)
 - [x] Mundo e imperios
 - [x] Listas (arreglos)
-- [ ] Estructuras de control (`si` y `mientras`)
+- [x] Estructuras de control (`si` y `mientras`)
 - [ ] Generar el archivo `.rmv` del mapa y copiarlo a la carpeta del juego
 - [ ] Cosas distintas para cada jugador
 - [ ] Optimización sencilla y reporte final

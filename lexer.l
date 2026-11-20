@@ -54,6 +54,7 @@ static void lexical_error(const char *message) {
 "nada"                 { yylval.line = yylineno; TOKEN(TOKEN_NOTHING); }
 "si"                   { pending_block = TOKEN_IF; yylval.line = yylineno; TOKEN(TOKEN_IF); }
 "sino"                 { pending_block = TOKEN_IF; yylval.line = yylineno; TOKEN(TOKEN_ELSE); }
+"mientras"             { pending_block = TOKEN_WHILE; yylval.line = yylineno; TOKEN(TOKEN_WHILE); }
 "mundo"                { pending_block = TOKEN_WORLD; yylval.line = yylineno; TOKEN(TOKEN_WORLD); }
 "imperio"              { pending_block = TOKEN_EMPIRE; yylval.line = yylineno; TOKEN(TOKEN_EMPIRE); }
 "tamano"               { yylval.line = yylineno; TOKEN(TOKEN_SIZE); }

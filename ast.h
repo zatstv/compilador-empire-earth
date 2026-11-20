@@ -51,6 +51,7 @@ typedef enum {
   POPULATE_STMT,
   TREASURE_STMT,
   IF_STMT,
+  WHILE_STMT,
 
   INT_LITERAL,
   FLOAT_LITERAL,
@@ -152,6 +153,10 @@ typedef struct ASTNode {
       struct ASTNode *thenBody;
       struct ASTNode *elseBody;
     } ifStatement;
+    struct {
+      struct ASTNode *condition;
+      struct ASTNode *body;
+    } whileStatement;
   } data;
 
   struct ASTNode *next; // Linked list for multiple statements
@@ -175,6 +180,7 @@ ASTNode *create_block_decl(NodeType type, const char *name, ASTNode *body, int l
 ASTNode *create_world_item(NodeType type, const char *word, ASTNode *amount, int line);
 ASTNode *create_binary_node(BinaryOperator op, ASTNode *left, ASTNode *right, int line);
 ASTNode *create_if_node(ASTNode *condition, ASTNode *then_body, ASTNode *else_body, int line);
+ASTNode *create_while_node(ASTNode *condition, ASTNode *body, int line);
 ASTNode *create_array_node(ASTNode *elements, int line);
 ASTNode *create_array_index(const char *name, ASTNode *index, int line);
 ASTNode *create_array_method_call(const char *name, const char *method, ASTNode *arguments,
