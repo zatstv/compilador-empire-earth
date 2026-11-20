@@ -1,5 +1,6 @@
 #include "ast.h"
 #include "codegen.h"
+#include "optimizer.h"
 #include "runtime.h"
 #include "semantic.h"
 #include "symbol_table.h"
@@ -87,7 +88,15 @@ int main(int argc, char **argv) {
   }
   printf("Correcto: todas las unidades existen y los tipos cuadran.\n");
 
-  title("4. Ejecucion");
+  title("4. Optimizacion");
+  int optimizations = optimize_program(&ast_root);
+  if (optimizations == 0) {
+    printf("No habia cuentas fijas ni codigo que nunca se ejecuta.\n");
+  } else {
+    printf("Se hicieron %d optimizacion(es) antes de ejecutar.\n", optimizations);
+  }
+
+  title("5. Ejecucion");
   int execution_succeeded = execute_program(ast_root, &symbol_table);
   if (execution_succeeded) {
     printf("VICTORIA: el programa se ejecuto sin errores.\n");
@@ -95,11 +104,11 @@ int main(int argc, char **argv) {
     printf("El programa se detuvo por una derrota.\n");
   }
 
-  title("5. Tabla de simbolos");
+  title("6. Tabla de simbolos");
   symbol_table_print(&symbol_table);
 
   if (execution_succeeded && program_has_world(ast_root)) {
-    title("6. Generacion del mapa");
+    title("7. Generacion del mapa");
     execution_succeeded = generate_map(ast_root, &symbol_table, options.input_path);
   }
 

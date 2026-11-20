@@ -7,7 +7,7 @@ CFLAGS    := -Wall -Wextra -std=gnu11 -O2 -I. -I$(BUILD_DIR)
 LDFLAGS   :=
 
 TARGET    := compiler
-HEADERS   := ast.h symbol_table.h semantic.h runtime.h string_utils.h codegen.h
+HEADERS   := ast.h symbol_table.h semantic.h runtime.h string_utils.h codegen.h optimizer.h
 LEX_SRC   := lexer.l
 YACC_SRC  := parser.y
 
@@ -23,6 +23,7 @@ OBJS      := $(BUILD_DIR)/main.o \
              $(BUILD_DIR)/semantic.o \
              $(BUILD_DIR)/runtime.o \
              $(BUILD_DIR)/codegen.o \
+             $(BUILD_DIR)/optimizer.o \
              $(BUILD_DIR)/string_utils.o \
              $(BUILD_DIR)/parser.tab.o \
              $(BUILD_DIR)/lex.yy.o
@@ -54,6 +55,9 @@ $(BUILD_DIR)/runtime.o: runtime.c runtime.h symbol_table.h ast.h string_utils.h 
 
 $(BUILD_DIR)/codegen.o: codegen.c codegen.h symbol_table.h ast.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c codegen.c -o $@
+
+$(BUILD_DIR)/optimizer.o: optimizer.c optimizer.h ast.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c optimizer.c -o $@
 
 $(BUILD_DIR)/string_utils.o: string_utils.c string_utils.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c string_utils.c -o $@

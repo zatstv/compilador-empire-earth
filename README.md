@@ -195,9 +195,10 @@ Si algo está mal el compilador muestra `DERROTA en la linea N:` y qué fue lo q
 1. Análisis léxico y sintáctico (`lexer.l` y `parser.y`)
 2. Arma el árbol de sintaxis (AST) y lo muestra como tabla (`ast.c`)
 3. Análisis semántico: revisa que las unidades, estrategias e imperios existan y que los tipos cuadren (`semantic.c`)
-4. Ejecuta el programa y calcula lo que tiene cada imperio (`runtime.c`)
-5. Muestra la tabla de símbolos con las unidades, estrategias, parámetros, el mundo y los imperios, en qué ámbito están y el valor final (`symbol_table.c`)
-6. Genera el mapa `.rmv`, lo copia a la carpeta del juego y muestra un reporte de lo que creó (`codegen.c`)
+4. Optimización: calcula de una vez las cuentas que solo tienen números (`2 + 3` pasa a `5`, `10 < 4` pasa a `guerra`) y quita los `si` y `mientras` que nunca se cumplen (`optimizer.c`)
+5. Ejecuta el programa y calcula lo que tiene cada imperio (`runtime.c`)
+6. Muestra la tabla de símbolos con las unidades, estrategias, parámetros, el mundo y los imperios, en qué ámbito están y el valor final (`symbol_table.c`)
+7. Genera el mapa `.rmv`, lo copia a la carpeta del juego y muestra un reporte de lo que creó (`codegen.c`)
 
 ## Lo que falta
 
@@ -208,7 +209,7 @@ Si algo está mal el compilador muestra `DERROTA en la linea N:` y qué fue lo q
 - [x] Estructuras de control (`si` y `mientras`)
 - [x] Generar el archivo `.rmv` del mapa y copiarlo a la carpeta del juego
 - [x] Cosas distintas según la época de la partida
-- [ ] Optimización sencilla y reporte final
+- [x] Optimización sencilla y reporte final
 
 ## Cómo correrlo
 
