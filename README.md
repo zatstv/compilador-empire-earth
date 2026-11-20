@@ -53,7 +53,7 @@ Con los números se puede sumar, restar, multiplicar y dividir (`+ - * /`).
 
 ### Mundo e imperios
 
-Con `mundo` se describe el mapa y con `imperio` lo que tiene cada jugador al empezar.
+Con `mundo` se describe el mapa y con `imperio` lo que tiene cada jugador al empezar. El compilador lo convierte en un mapa `.rmv` que el juego abre en **Mapa aleatorio**.
 
 ```
 mundo "Tierra de Hugo" {
@@ -62,20 +62,26 @@ mundo "Tierra de Hugo" {
     agua 0;
 }
 
-imperio hugo {
+imperio todos {
     poblar ciudadano juntar(5, 5);
+    poblar garrotero 5;
     tesoro oro 3;
-}
-
-imperio rival {
-    poblar ciudadano 5;
-    tesoro piedra 2;
 }
 ```
 
-- `tamano`, `terreno` y `agua` van dentro del `mundo`.
-- `poblar` dice cuántas unidades de un tipo tiene el imperio y `tesoro` cuántas minas o recursos.
+| Palabra | Qué se puede poner |
+|---|---|
+| `terreno` | pradera, montanas, continente, islas, islitas, mediterraneo, torneo |
+| `tamano` | diminuto, pequeno, mediano, grande, enorme, gigante |
+| `agua` | de 0 (nada) a 10 (casi todo agua) |
+| `poblar` | ciudadano, ciudadana, garrotero, mosquetero, elefante, panzer, tanque, zeus (máximo 50 de cada uno) |
+| `tesoro` | oro, hierro, piedra, bayas (máximo 20 minas de cada uno) |
+
+- Solo hay un `mundo` y un `imperio`, porque el juego le da a todos los jugadores lo mismo del mapa.
+- El `terreno` escoge el mapa del juego que se usa de base. El `tamano` se escoge en el menú de la partida, así que el compilador solo lo recuerda en el reporte.
 - Las cantidades pueden ser números, unidades, cuentas o llamadas a estrategias.
+- Si se repite un `poblar` o un `tesoro` del mismo tipo, se juntan en uno solo.
+- El mapa se guarda en `Data/Random Map Scripts` del juego. Si el juego está en otra carpeta, se pone en la variable `EE_MAPAS`.
 
 ### Listas
 
@@ -163,6 +169,7 @@ Si algo está mal el compilador muestra `DERROTA en la linea N:` y qué fue lo q
 3. Análisis semántico: revisa que las unidades, estrategias e imperios existan y que los tipos cuadren (`semantic.c`)
 4. Ejecuta el programa y calcula lo que tiene cada imperio (`runtime.c`)
 5. Muestra la tabla de símbolos con las unidades, estrategias, parámetros, el mundo y los imperios, en qué ámbito están y el valor final (`symbol_table.c`)
+6. Genera el mapa `.rmv`, lo copia a la carpeta del juego y muestra un reporte de lo que creó (`codegen.c`)
 
 ## Lo que falta
 
@@ -171,8 +178,8 @@ Si algo está mal el compilador muestra `DERROTA en la linea N:` y qué fue lo q
 - [x] Mundo e imperios
 - [x] Listas (arreglos)
 - [x] Estructuras de control (`si` y `mientras`)
-- [ ] Generar el archivo `.rmv` del mapa y copiarlo a la carpeta del juego
-- [ ] Cosas distintas para cada jugador
+- [x] Generar el archivo `.rmv` del mapa y copiarlo a la carpeta del juego
+- [ ] Cosas distintas según la época de la partida
 - [ ] Optimización sencilla y reporte final
 
 ## Cómo correrlo

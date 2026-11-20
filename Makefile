@@ -7,7 +7,7 @@ CFLAGS    := -Wall -Wextra -std=gnu11 -O2 -I. -I$(BUILD_DIR)
 LDFLAGS   :=
 
 TARGET    := compiler
-HEADERS   := ast.h symbol_table.h semantic.h runtime.h string_utils.h
+HEADERS   := ast.h symbol_table.h semantic.h runtime.h string_utils.h codegen.h
 LEX_SRC   := lexer.l
 YACC_SRC  := parser.y
 
@@ -22,6 +22,7 @@ OBJS      := $(BUILD_DIR)/main.o \
              $(BUILD_DIR)/symbol_table.o \
              $(BUILD_DIR)/semantic.o \
              $(BUILD_DIR)/runtime.o \
+             $(BUILD_DIR)/codegen.o \
              $(BUILD_DIR)/string_utils.o \
              $(BUILD_DIR)/parser.tab.o \
              $(BUILD_DIR)/lex.yy.o
@@ -45,11 +46,14 @@ $(BUILD_DIR)/ast.o: ast.c $(HEADERS) | $(BUILD_DIR)
 $(BUILD_DIR)/symbol_table.o: symbol_table.c symbol_table.h ast.h string_utils.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c symbol_table.c -o $@
 
-$(BUILD_DIR)/semantic.o: semantic.c semantic.h symbol_table.h ast.h | $(BUILD_DIR)
+$(BUILD_DIR)/semantic.o: semantic.c semantic.h symbol_table.h ast.h codegen.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c semantic.c -o $@
 
 $(BUILD_DIR)/runtime.o: runtime.c runtime.h symbol_table.h ast.h string_utils.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c runtime.c -o $@
+
+$(BUILD_DIR)/codegen.o: codegen.c codegen.h symbol_table.h ast.h | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c codegen.c -o $@
 
 $(BUILD_DIR)/string_utils.o: string_utils.c string_utils.h | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -c string_utils.c -o $@

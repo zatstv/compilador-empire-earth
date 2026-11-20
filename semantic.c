@@ -1,5 +1,6 @@
 #include "semantic.h"
 
+#include "codegen.h"
 #include "string_utils.h"
 
 #include <stdarg.h>
@@ -419,6 +420,17 @@ static void check_world_item(ASTNode *item, SymbolTable *table) {
   default: break;
   }
 
+  const char *word = item->data.worldItem.word;
+  if (item->type == SIZE_STMT && game_size_name(word) == NULL) {
+    defeat(item->line, "'%s' no es un tamano del juego (se puede: %s)", word, valid_words("tamano"));
+  } else if (item->type == TERRAIN_STMT && game_map_name(word) == NULL) {
+    defeat(item->line, "'%s' no es un terreno del juego (se puede: %s)", word, valid_words("terreno"));
+  } else if (item->type == POPULATE_STMT && game_unit_name(word) == NULL) {
+    defeat(item->line, "'%s' no es una unidad del juego (se puede: %s)", word, valid_words("poblar"));
+  } else if (item->type == TREASURE_STMT && game_resource_name(word) == NULL) {
+    defeat(item->line, "'%s' no es un recurso del juego (se puede: %s)", word, valid_words("tesoro"));
+  }
+
   ASTNode *amount = item->data.worldItem.amount;
   if (amount != NULL) {
     check_value(TYPE_RECURSO, amount, table);
@@ -518,8 +530,26 @@ static void check_statement(ASTNode *node, SymbolTable *table) {
 int semantic_analysis(ASTNode *program, SymbolTable *table) {
   errors = 0;
   current_function = NULL;
+  const ASTNode *world = NULL;
+  const ASTNode *empire = NULL;
   for (ASTNode *node = program; node != NULL; node = node->next) {
     check_statement(node, table);
+    if (node->type == WORLD_DECL) {
+      if (world != NULL) {
+        defeat(node->line, "solo puede haber un mundo (ya hay uno en la linea %d)", world->line);
+      }
+      world = node;
+    } else if (node->type == EMPIRE_DECL) {
+      if (empire != NULL) {
+        defeat(node->line, "el mapa le da lo mismo a todos los jugadores, asi que solo puede haber "
+                           "un imperio (ya hay uno en la linea %d)", empire->line);
+      } else {
+        empire = node;
+      }
+    }
+  }
+  if (empire != NULL && world == NULL) {
+    defeat(empire->line, "el imperio necesita un mundo donde vivir");
   }
   return errors;
 }

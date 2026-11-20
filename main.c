@@ -1,4 +1,5 @@
 #include "ast.h"
+#include "codegen.h"
 #include "runtime.h"
 #include "semantic.h"
 #include "symbol_table.h"
@@ -96,6 +97,11 @@ int main(int argc, char **argv) {
 
   title("5. Tabla de simbolos");
   symbol_table_print(&symbol_table);
+
+  if (execution_succeeded && program_has_world(ast_root)) {
+    title("6. Generacion del mapa");
+    execution_succeeded = generate_map(ast_root, &symbol_table, options.input_path);
+  }
 
   /* Clean up the AST heap allocations */
   free_ast(ast_root);
