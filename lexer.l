@@ -62,6 +62,7 @@ static void lexical_error(const char *message) {
 "agua"                 { yylval.line = yylineno; TOKEN(TOKEN_WATER); }
 "poblar"               { yylval.line = yylineno; TOKEN(TOKEN_POPULATE); }
 "tesoro"               { yylval.line = yylineno; TOKEN(TOKEN_TREASURE); }
+"en"                   { pending_block = TOKEN_IN; yylval.line = yylineno; TOKEN(TOKEN_IN); }
 
 "recurso"              { yylval.type.value = TYPE_RECURSO; yylval.type.line = yylineno; TOKEN(TOKEN_TYPE); }
 "epoca"                { yylval.type.value = TYPE_EPOCA;   yylval.type.line = yylineno; TOKEN(TOKEN_TYPE); }

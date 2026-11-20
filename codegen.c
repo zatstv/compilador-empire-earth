@@ -44,6 +44,18 @@ static const Word sizes[] = {
     {NULL, NULL},
 };
 
+static const char *epochs[15] = {
+    NULL,         "Paleo",      "Stone",      "Copper",   "Bronze",
+    "Dark",       "Middle",     "Renaissance", "Imperial", "Industrial",
+    "WW1",        "WW2",        "Modern",     "Information", "Nano",
+};
+
+static const char *epoch_names[15] = {
+    NULL,          "Prehistoria", "Edad de Piedra", "Edad del Cobre", "Edad del Bronce",
+    "Edad Oscura", "Edad Media",  "Renacimiento",   "Imperial",       "Industrial",
+    "Primera Guerra Mundial", "Segunda Guerra Mundial", "Moderna", "Digital", "Nano",
+};
+
 static const char *find(const Word *list, const char *word) {
   for (; list->word != NULL; list++) {
     if (strcmp(list->word, word) == 0) return list->game;
@@ -87,15 +99,22 @@ typedef struct {
 } Kind;
 
 typedef struct {
+  Kind units[MAX_KINDS];
+  int unitCount;
+  Kind treasures[MAX_KINDS];
+  int treasureCount;
+  int used;
+  int line;
+} Group;
+
+typedef struct {
   const char *name;
   const char *size;
   const char *terrain;
   long water;
   int hasWater;
-  Kind units[MAX_KINDS];
-  int unitCount;
-  Kind treasures[MAX_KINDS];
-  int treasureCount;
+  Group common;
+  Group epoch[15];
   int merged;
 } Plan;
 
@@ -127,6 +146,66 @@ static int add_kind(Plan *plan, Kind *list, int *count, const ASTNode *item, lon
   return 1;
 }
 
+static int add_items(Plan *plan, Group *group, const ASTNode *item, const SymbolTable *table);
+
+static int add_item(Plan *plan, Group *group, const ASTNode *item, const SymbolTable *table) {
+  const Symbol *symbol = value_of(table, item);
+  if (symbol == NULL) return defeat(item->line, "no se pudo calcular este valor");
+  switch (item->type) {
+  case SIZE_STMT: plan->size = symbol->value.strValue; break;
+  case TERRAIN_STMT: plan->terrain = symbol->value.strValue; break;
+  case WATER_STMT:
+    if (symbol->value.intValue > 10) {
+      return defeat(item->line, "el agua va de 0 (nada) a 10 (casi todo agua)");
+    }
+    plan->water = symbol->value.intValue;
+    plan->hasWater = 1;
+    break;
+  case POPULATE_STMT:
+    group->used = 1;
+    return add_kind(plan, group->units, &group->unitCount, item, symbol->value.intValue);
+  case TREASURE_STMT:
+    group->used = 1;
+    return add_kind(plan, group->treasures, &group->treasureCount, item, symbol->value.intValue);
+  case EPOCH_BLOCK: {
+    Group *epoch = &plan->epoch[symbol->value.intValue];
+    if (epoch->used) plan->merged++;
+    epoch->used = 1;
+    if (epoch->line == 0) epoch->line = item->line;
+    return add_items(plan, epoch, item->data.epochBlock.body, table);
+  }
+  default: break;
+  }
+  return 1;
+}
+
+static int add_items(Plan *plan, Group *group, const ASTNode *item, const SymbolTable *table) {
+  for (; item != NULL; item = item->next) {
+    if (!add_item(plan, group, item, table)) return 0;
+  }
+  return 1;
+}
+
+static int check_limits(const Group *group) {
+  for (int i = 0; i < group->unitCount; i++) {
+    if (group->units[i].amount > MAX_UNITS_PER_KIND) {
+      fprintf(stderr, "DERROTA en la linea %d: no caben mas de %d %s por jugador (pediste %ld)\n",
+              group->units[i].line, MAX_UNITS_PER_KIND, group->units[i].word,
+              group->units[i].amount);
+      return 0;
+    }
+  }
+  for (int i = 0; i < group->treasureCount; i++) {
+    if (group->treasures[i].amount > MAX_TREASURE_PER_KIND) {
+      fprintf(stderr, "DERROTA en la linea %d: no caben mas de %d minas de %s por jugador (pediste %ld)\n",
+              group->treasures[i].line, MAX_TREASURE_PER_KIND, group->treasures[i].word,
+              group->treasures[i].amount);
+      return 0;
+    }
+  }
+  return 1;
+}
+
 static int build_plan(const ASTNode *program, const SymbolTable *table, Plan *plan) {
   memset(plan, 0, sizeof *plan);
   plan->size = "mediano";
@@ -134,45 +213,11 @@ static int build_plan(const ASTNode *program, const SymbolTable *table, Plan *pl
   for (const ASTNode *node = program; node != NULL; node = node->next) {
     if (node->type != WORLD_DECL && node->type != EMPIRE_DECL) continue;
     if (node->type == WORLD_DECL) plan->name = node->data.block.identifier;
-    for (const ASTNode *item = node->data.block.body; item != NULL; item = item->next) {
-      const Symbol *symbol = value_of(table, item);
-      if (symbol == NULL) return defeat(item->line, "no se pudo calcular este valor");
-      switch (item->type) {
-      case SIZE_STMT: plan->size = symbol->value.strValue; break;
-      case TERRAIN_STMT: plan->terrain = symbol->value.strValue; break;
-      case WATER_STMT:
-        if (symbol->value.intValue > 10) {
-          return defeat(item->line, "el agua va de 0 (nada) a 10 (casi todo agua)");
-        }
-        plan->water = symbol->value.intValue;
-        plan->hasWater = 1;
-        break;
-      case POPULATE_STMT:
-        if (!add_kind(plan, plan->units, &plan->unitCount, item, symbol->value.intValue)) return 0;
-        break;
-      case TREASURE_STMT:
-        if (!add_kind(plan, plan->treasures, &plan->treasureCount, item, symbol->value.intValue)) {
-          return 0;
-        }
-        break;
-      default: break;
-      }
-    }
+    if (!add_items(plan, &plan->common, node->data.block.body, table)) return 0;
   }
-  for (int i = 0; i < plan->unitCount; i++) {
-    if (plan->units[i].amount > MAX_UNITS_PER_KIND) {
-      fprintf(stderr, "DERROTA en la linea %d: no caben mas de %d %s por jugador (pediste %ld)\n",
-              plan->units[i].line, MAX_UNITS_PER_KIND, plan->units[i].word, plan->units[i].amount);
-      return 0;
-    }
-  }
-  for (int i = 0; i < plan->treasureCount; i++) {
-    if (plan->treasures[i].amount > MAX_TREASURE_PER_KIND) {
-      fprintf(stderr, "DERROTA en la linea %d: no caben mas de %d minas de %s por jugador (pediste %ld)\n",
-              plan->treasures[i].line, MAX_TREASURE_PER_KIND, plan->treasures[i].word,
-              plan->treasures[i].amount);
-      return 0;
-    }
+  if (!check_limits(&plan->common)) return 0;
+  for (int e = 1; e <= 14; e++) {
+    if (!check_limits(&plan->epoch[e])) return 0;
   }
   return 1;
 }
@@ -197,6 +242,26 @@ static int valid_file_name(const char *name) {
     if (strcasecmp(map->game, name) == 0) return 0;
   }
   return 1;
+}
+
+static double write_group(FILE *map, const Group *group, double x) {
+  for (int i = 0; i < group->unitCount; i++) {
+    const char *game = game_unit_name(group->units[i].word);
+    double step = strstr(game, "Citizen") ? 0.5 : 1.0;
+    for (long k = 0; k < group->units[i].amount; k++) {
+      if (k > 0 && k % 5 == 0) x -= step;
+      fprintf(map, "PlaceUnit\t\t\t\t(%s,\t\t%.1f,\t%.1f,\t\t180)\r\n", game, x,
+              -3 + (k % 5) * step);
+    }
+    if (group->units[i].amount > 0) x -= step + 0.5;
+  }
+  for (int i = 0; i < group->treasureCount; i++) {
+    const char *game = game_resource_name(group->treasures[i].word);
+    for (long k = 0; k < group->treasures[i].amount; k++) {
+      fprintf(map, "PlaceResourceInRing (%s, 6, 8)\r\n", game);
+    }
+  }
+  return x;
 }
 
 static int write_map(const Plan *plan, const char *source_path, const char *folder, char *out,
@@ -233,26 +298,27 @@ static int write_map(const Plan *plan, const char *source_path, const char *fold
           file ? file + 1 : source_path);
   fprintf(map, "// Mundo \"%s\": terreno %s, tamano %s\r\n\r\n", plan->name, plan->terrain,
           plan->size);
-  double x = -3;
-  for (int i = 0; i < plan->unitCount; i++) {
-    const char *game = game_unit_name(plan->units[i].word);
-    double step = strstr(game, "Citizen") ? 0.5 : 1.0;
-    for (long k = 0; k < plan->units[i].amount; k++) {
-      if (k > 0 && k % 5 == 0) x -= step;
-      fprintf(map, "PlaceUnit\t\t\t\t(%s,\t\t%.1f,\t%.1f,\t\t180)\r\n", game, x,
-              -3 + (k % 5) * step);
-    }
-    if (plan->units[i].amount > 0) x -= step + 0.5;
+  double x = write_group(map, &plan->common, -3);
+  int first = 1;
+  for (int e = 14; e >= 1; e--) {
+    if (!plan->epoch[e].used) continue;
+    fprintf(map, "\r\n%s\tIs%sEpoch\r\n", first ? "#if" : "#elif", epochs[e]);
+    write_group(map, &plan->epoch[e], x);
+    first = 0;
   }
-  fprintf(map, "\r\n");
-  for (int i = 0; i < plan->treasureCount; i++) {
-    const char *game = game_resource_name(plan->treasures[i].word);
-    for (long k = 0; k < plan->treasures[i].amount; k++) {
-      fprintf(map, "PlaceResourceInRing (%s, 6, 8)\r\n", game);
-    }
-  }
+  if (!first) fprintf(map, "#endif\r\n");
   fclose(map);
   return 1;
+}
+
+static void print_group(const Group *group) {
+  if (group->unitCount == 0 && group->treasureCount == 0) printf("    (nada extra)\n");
+  for (int i = 0; i < group->unitCount; i++) {
+    printf("    %ld %s\n", group->units[i].amount, group->units[i].word);
+  }
+  for (int i = 0; i < group->treasureCount; i++) {
+    printf("    %ld mina(s) de %s\n", group->treasures[i].amount, group->treasures[i].word);
+  }
 }
 
 int generate_map(const ASTNode *program, const SymbolTable *table, const char *source_path) {
@@ -271,12 +337,11 @@ int generate_map(const ASTNode *program, const SymbolTable *table, const char *s
   if (plan.hasWater) printf(", agua %ld de 10", plan.water);
   printf("\n  Tamano:     escoger %s en el menu de la partida\n", game_size_name(plan.size));
   printf("  Cada jugador empieza con lo normal del mapa, y ademas:\n");
-  if (plan.unitCount == 0 && plan.treasureCount == 0) printf("    (nada extra)\n");
-  for (int i = 0; i < plan.unitCount; i++) {
-    printf("    %ld %s\n", plan.units[i].amount, plan.units[i].word);
-  }
-  for (int i = 0; i < plan.treasureCount; i++) {
-    printf("    %ld mina(s) de %s\n", plan.treasures[i].amount, plan.treasures[i].word);
+  print_group(&plan.common);
+  for (int e = 1; e <= 14; e++) {
+    if (!plan.epoch[e].used) continue;
+    printf("  Si la partida empieza en la epoca %d (%s), tambien:\n", e, epoch_names[e]);
+    print_group(&plan.epoch[e]);
   }
   if (plan.merged > 0) {
     printf("  Optimizacion: se juntaron %d instruccion(es) repetida(s)\n", plan.merged);

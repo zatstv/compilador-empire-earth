@@ -449,6 +449,26 @@ static void check_world_item(ASTNode *item, SymbolTable *table) {
   }
 }
 
+static void check_epoch_block(ASTNode *node, SymbolTable *table) {
+  ASTNode *epoch = node->data.epochBlock.epoch;
+  check_value(TYPE_EPOCA, epoch, table);
+  Symbol *symbol = symbol_table_insert(table, "en epoca", TYPE_EPOCA, SYMBOL_SETTING, node->line);
+  if (symbol == NULL) {
+    defeat(node->line, "no hay memoria para el bloque de epoca");
+    return;
+  }
+  symbol->item = node;
+  symbol->visible = 0;
+
+  const char *outer_scope = table->scopeName;
+  symbol_table_enter_scope(table, "epoca");
+  for (ASTNode *item = node->data.epochBlock.body; item != NULL; item = item->next) {
+    check_world_item(item, table);
+  }
+  symbol_table_exit_scope(table);
+  table->scopeName = outer_scope;
+}
+
 static void check_block(ASTNode *node, SymbolTable *table) {
   const BlockDeclaration *block = &node->data.block;
   const Symbol *existing = symbol_table_lookup_current(table, block->identifier);
@@ -464,7 +484,11 @@ static void check_block(ASTNode *node, SymbolTable *table) {
 
   symbol_table_enter_scope(table, block->identifier);
   for (ASTNode *item = block->body; item != NULL; item = item->next) {
-    check_world_item(item, table);
+    if (item->type == EPOCH_BLOCK) {
+      check_epoch_block(item, table);
+    } else {
+      check_world_item(item, table);
+    }
   }
   symbol_table_exit_scope(table);
 }

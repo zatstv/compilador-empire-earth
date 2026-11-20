@@ -388,23 +388,40 @@ static int evaluate(const ASTNode *expr, RuntimeVariable *variables, RuntimeValu
   }
 }
 
-static int execute_block(const ASTNode *node, RuntimeVariable *variables) {
-  for (const ASTNode *item = node->data.block.body; item != NULL; item = item->next) {
-    const ASTNode *amount = item->data.worldItem.amount;
+static void save_item_value(const ASTNode *item, const RuntimeValue *value) {
+  for (Symbol *symbol = symbols->head; symbol != NULL; symbol = symbol->next) {
+    if (symbol->item == item) {
+      symbol->value = value->data;
+      symbol->hasValue = 1;
+    }
+  }
+}
+
+static int execute_items(const ASTNode *item, RuntimeVariable *variables) {
+  for (; item != NULL; item = item->next) {
     RuntimeValue value;
+    if (item->type == EPOCH_BLOCK) {
+      const ASTNode *epoch = item->data.epochBlock.epoch;
+      if (!evaluate(epoch, variables, &value) || !fits(TYPE_EPOCA, &value, epoch->line, "en epoca")) {
+        return 0;
+      }
+      save_item_value(item, &value);
+      if (!execute_items(item->data.epochBlock.body, variables)) return 0;
+      continue;
+    }
+    const ASTNode *amount = item->data.worldItem.amount;
     if (amount == NULL) continue;
     const char *name = item->type == WATER_STMT ? "agua" : item->data.worldItem.word;
     if (!evaluate(amount, variables, &value) || !fits(TYPE_RECURSO, &value, amount->line, name)) {
       return 0;
     }
-    for (Symbol *symbol = symbols->head; symbol != NULL; symbol = symbol->next) {
-      if (symbol->item == item) {
-        symbol->value = value.data;
-        symbol->hasValue = 1;
-      }
-    }
+    save_item_value(item, &value);
   }
   return 1;
+}
+
+static int execute_block(const ASTNode *node, RuntimeVariable *variables) {
+  return execute_items(node->data.block.body, variables);
 }
 
 static int execute_statement(const ASTNode *node, RuntimeVariable **variables) {

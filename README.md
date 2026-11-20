@@ -83,6 +83,34 @@ imperio todos {
 - Si se repite un `poblar` o un `tesoro` del mismo tipo, se juntan en uno solo.
 - El mapa se guarda en `Data/Random Map Scripts` del juego. Si el juego está en otra carpeta, se pone en la variable `EE_MAPAS`.
 
+Dentro del imperio, `en epoca` agrega cosas que solo salen si la partida empieza en esa época (se escoge en el menú):
+
+```
+imperio todos {
+    poblar ciudadano 5;
+    en epoca 14 {
+        poblar zeus 2;
+    }
+    en epoca 12 {
+        poblar tanque 3;
+        tesoro oro 2;
+    }
+}
+```
+
+| Época | Nombre | | Época | Nombre |
+|---|---|---|---|---|
+| 1 | Prehistoria | | 8 | Imperial |
+| 2 | Edad de Piedra | | 9 | Industrial |
+| 3 | Edad del Cobre | | 10 | Primera Guerra Mundial |
+| 4 | Edad del Bronce | | 11 | Segunda Guerra Mundial |
+| 5 | Edad Oscura | | 12 | Moderna |
+| 6 | Edad Media | | 13 | Digital |
+| 7 | Renacimiento | | 14 | Nano |
+
+- El número de la época puede ser una cuenta o una unidad de tipo `epoca`.
+- Si dos bloques son de la misma época, se juntan.
+
 ### Listas
 
 Cualquier tipo se puede volver lista poniéndole `[]`. Las posiciones empiezan en 0.
@@ -179,7 +207,7 @@ Si algo está mal el compilador muestra `DERROTA en la linea N:` y qué fue lo q
 - [x] Listas (arreglos)
 - [x] Estructuras de control (`si` y `mientras`)
 - [x] Generar el archivo `.rmv` del mapa y copiarlo a la carpeta del juego
-- [ ] Cosas distintas según la época de la partida
+- [x] Cosas distintas según la época de la partida
 - [ ] Optimización sencilla y reporte final
 
 ## Cómo correrlo

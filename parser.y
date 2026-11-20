@@ -42,7 +42,7 @@ static void syntax_defeat(int line, const char *message, const char *name) {
 %token <line> TOKEN_PROGRAM_START TOKEN_PROGRAM_END TOKEN_RECRUIT TOKEN_ARROW
 %token <line> TOKEN_FUNCTION TOKEN_RETURN TOKEN_NOTHING
 %token <line> TOKEN_WORLD TOKEN_EMPIRE TOKEN_SIZE TOKEN_TERRAIN TOKEN_WATER
-%token <line> TOKEN_POPULATE TOKEN_TREASURE
+%token <line> TOKEN_POPULATE TOKEN_TREASURE TOKEN_IN
 %token <line> TOKEN_IF TOKEN_ELSE TOKEN_WHILE
 %token TOKEN_EQ TOKEN_NE TOKEN_LE TOKEN_GE
 %token <type> TOKEN_TYPE
@@ -66,6 +66,7 @@ static void syntax_defeat(int line, const char *message, const char *name) {
 %type <node> function_call optional_arguments argument_list
 %type <node> world_declaration world_setting_list world_setting
 %type <node> empire_declaration empire_statement_list empire_statement
+%type <node> empire_item epoch_block epoch_statement_list epoch_statement
 %type <node> if_statement block optional_else_block while_statement
 %type <node> array_method_call
 %type <parameter> optional_parameters parameter_list parameter
@@ -181,6 +182,43 @@ empire_statement_list:
     ;
 
 empire_statement:
+    empire_item { $$ = $1; }
+    | epoch_block { $$ = $1; }
+    | error ';' {
+        yyerrok;
+        $$ = NULL;
+    }
+    ;
+
+epoch_block:
+    TOKEN_IN TOKEN_TYPE expression '{' epoch_statement_list '}' {
+        if ($2.value != TYPE_EPOCA) {
+            syntax_defeat($2.line, "despues de 'en' va la palabra epoca, no", data_type_name($2.value));
+        }
+        $$ = create_epoch_block($3, $5, $1);
+    }
+    | TOKEN_IN error '}' {
+        yyerrok;
+        $$ = NULL;
+    }
+    ;
+
+epoch_statement_list:
+    { $$ = NULL; }
+    | epoch_statement_list epoch_statement {
+        $$ = append_statement($1, $2);
+    }
+    ;
+
+epoch_statement:
+    empire_item { $$ = $1; }
+    | error ';' {
+        yyerrok;
+        $$ = NULL;
+    }
+    ;
+
+empire_item:
     TOKEN_POPULATE TOKEN_IDENTIFIER expression ';' {
         $$ = create_world_item(POPULATE_STMT, $2.text, $3, $1);
         free($2.text);
@@ -188,10 +226,6 @@ empire_statement:
     | TOKEN_TREASURE TOKEN_IDENTIFIER expression ';' {
         $$ = create_world_item(TREASURE_STMT, $2.text, $3, $1);
         free($2.text);
-    }
-    | error ';' {
-        yyerrok;
-        $$ = NULL;
     }
     ;
 
@@ -411,15 +445,16 @@ expression:
 %%
 
 static const char *block_name(int block, int form) {
-    static const char *names[5][3] = {
+    static const char *names[6][3] = {
         {"la estrategia", "una estrategia", "de la estrategia"},
         {"el mundo", "un mundo", "del mundo"},
         {"el imperio", "un imperio", "del imperio"},
         {"el si", "un si", "del si"},
         {"el mientras", "un mientras", "del mientras"},
+        {"el bloque de epoca", "un bloque de epoca", "del bloque de epoca"},
     };
     int row = block == TOKEN_WORLD ? 1 : block == TOKEN_EMPIRE ? 2 : block == TOKEN_IF ? 3 :
-              block == TOKEN_WHILE ? 4 : 0;
+              block == TOKEN_WHILE ? 4 : block == TOKEN_IN ? 5 : 0;
     return names[row][form];
 }
 
@@ -440,8 +475,12 @@ void yyerror(const char *s) {
                (open_braces == 0 || current_block != TOKEN_WORLD)) {
         fprintf(stderr, "DERROTA en la linea %d: %s solo se usa dentro del mundo\n", yylineno,
                 yytext);
+    } else if (yychar == TOKEN_IN && (open_braces == 0 || current_block != TOKEN_EMPIRE)) {
+        fprintf(stderr, "DERROTA en la linea %d: en epoca solo se usa dentro de un imperio\n",
+                yylineno);
     } else if ((yychar == TOKEN_POPULATE || yychar == TOKEN_TREASURE) &&
-               (open_braces == 0 || current_block != TOKEN_EMPIRE)) {
+               (open_braces == 0 ||
+                (current_block != TOKEN_EMPIRE && current_block != TOKEN_IN))) {
         fprintf(stderr, "DERROTA en la linea %d: %s solo se usa dentro de un imperio\n", yylineno,
                 yytext);
     } else if (yychar == TOKEN_RETURN && (open_braces == 0 || current_block != TOKEN_FUNCTION)) {
@@ -474,7 +513,7 @@ void yyerror(const char *s) {
                yychar == TOKEN_WORLD || yychar == TOKEN_EMPIRE || yychar == TOKEN_SIZE ||
                yychar == TOKEN_TERRAIN || yychar == TOKEN_WATER || yychar == TOKEN_POPULATE ||
                yychar == TOKEN_TREASURE || yychar == TOKEN_IF || yychar == TOKEN_ELSE ||
-               yychar == TOKEN_WHILE) {
+               yychar == TOKEN_WHILE || yychar == TOKEN_IN) {
         fprintf(stderr, "DERROTA en la linea %d: '%s' es palabra reservada y no se puede usar ahi\n",
                 yylineno, yytext);
     } else {

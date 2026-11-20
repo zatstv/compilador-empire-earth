@@ -130,6 +130,13 @@ ASTNode *create_world_item(NodeType type, const char *word, ASTNode *amount, int
   return node;
 }
 
+ASTNode *create_epoch_block(ASTNode *epoch, ASTNode *body, int line) {
+  ASTNode *node = allocate_new_node(EPOCH_BLOCK, line);
+  node->data.epochBlock.epoch = epoch;
+  node->data.epochBlock.body = body;
+  return node;
+}
+
 ASTNode *create_binary_node(BinaryOperator op, ASTNode *left, ASTNode *right, int line) {
   ASTNode *node = allocate_new_node(BINARY_OP, line);
   node->data.binary.op = op;
@@ -365,6 +372,10 @@ static void statement_rows(const ASTNode *node, int depth) {
       table_row(node->line, depth + 1, "Repetir", "-", "-",
                 node->data.whileStatement.body ? "" : "(vacio)");
       statement_rows(node->data.whileStatement.body, depth + 2);
+    } else if (node->type == EPOCH_BLOCK) {
+      table_row(node->line, depth, "En epoca", "-", "-", "");
+      expression_rows(node->data.epochBlock.epoch, depth + 1);
+      statement_rows(node->data.epochBlock.body, depth + 1);
     } else {
       const WorldItem *item = &node->data.worldItem;
       const char *name = "?";
@@ -462,6 +473,10 @@ void free_ast(ASTNode *node) {
     case WHILE_STMT:
       free_ast(node->data.whileStatement.condition);
       free_ast(node->data.whileStatement.body);
+      break;
+    case EPOCH_BLOCK:
+      free_ast(node->data.epochBlock.epoch);
+      free_ast(node->data.epochBlock.body);
       break;
     case ARRAY_LITERAL:
       free_ast(node->data.arrayLiteral.elements);
